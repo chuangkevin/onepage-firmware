@@ -95,7 +95,8 @@ void TailscaleManager::ensureUp() {
   starting_ = true;
   // 8 KB stack: microlink_init() does NVS + several heap allocations and
   // microlink_start() spawns its own long-lived tasks, but neither blocks here.
-  const BaseType_t ok = xTaskCreatePinnedToCore(taskEntry, "ts_bringup", 8 * 1024, this, 4, nullptr, 1);
+  // ESP32-C61 is single-core: pin to core 0 (core 1 asserts on this chip).
+  const BaseType_t ok = xTaskCreatePinnedToCore(taskEntry, "ts_bringup", 8 * 1024, this, 4, nullptr, 0);
   if (ok != pdPASS) {
     LOG_ERR("TS", "failed to create tailnet bring-up task");
     starting_ = false;

@@ -80,10 +80,10 @@ void SettingsActivity::rebuildSettingsLists() {
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   // Readflix book library lives next to the font browser as another remote source.
   readerSettings.insert(readerSettings.begin() + 2,
-                        SettingInfo::Action(StrId::STR_OPDS_BROWSER, SettingAction::ReadflixDownload));
+                        SettingInfo::Action(StrId::STR_READFLIX, SettingAction::ReadflixDownload));
   // Tailscale QR login for the overlay that readflix is only reachable through.
   readerSettings.insert(readerSettings.begin() + 3,
-                        SettingInfo::Action(StrId::STR_OPDS_BROWSER, SettingAction::TailscaleLogin));
+                        SettingInfo::Action(StrId::STR_TAILSCALE_LOGIN, SettingAction::TailscaleLogin));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
 
   // Update currentSettings pointer and count for the active category
