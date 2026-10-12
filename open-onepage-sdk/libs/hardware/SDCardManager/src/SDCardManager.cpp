@@ -1,5 +1,7 @@
 #include "SDCardManager.h"
 
+#include <esp_partition.h>
+
 namespace {
 #ifdef ONEPAGE_C61
 constexpr uint8_t SD_CS = 26;        // OnePage SD CS (shared SPI bus with EPD)
@@ -12,7 +14,7 @@ constexpr uint32_t SPI_FQ = 20000000;
 constexpr uint8_t SD_CS = 12;
 constexpr uint32_t SPI_FQ = 40000000;
 #endif
-}
+}  // namespace
 
 SDCardManager SDCardManager::instance;
 
@@ -26,28 +28,114 @@ bool SDCardManager::begin() {
   // few times with a short settle delay before giving up — a reboot always
   // worked, which is exactly the symptom of a too-early first attempt.
   initialized = false;
+  bool sdOk = false;
   for (int attempt = 0; attempt < 5; ++attempt) {
     if (sd.begin(SD_CS, SPI_FQ)) {
-      initialized = true;
+      sdOk = true;
       break;
     }
     delay(100);
   }
   if (Serial) {
-    Serial.printf("[%lu] [SD] %s\n", millis(), initialized ? "SD card detected" : "SD card not detected");
+    Serial.printf("[%lu] [SD] %s\n", millis(), sdOk ? "SD card detected" : "SD card not detected");
   }
-  return initialized;
 #else
-  if (!sd.begin(SD_CS, SPI_FQ)) {
-    if (Serial) Serial.printf("[%lu] [SD] SD card not detected\n", millis());
-    initialized = false;
-  } else {
-    if (Serial) Serial.printf("[%lu] [SD] SD card detected\n", millis());
+  const bool sdOk = sd.begin(SD_CS, SPI_FQ);
+  if (Serial) {
+    Serial.printf("[%lu] [SD] %s\n", millis(), sdOk ? "SD card detected" : "SD card not detected");
+  }
+#endif
+
+  if (sdOk) {
+    usingInternal = false;
     initialized = true;
+    return true;
   }
 
-  return initialized;
-#endif
+  // No microSD: fall back to the internal-flash volume so the reader still runs.
+  if (beginInternal()) {
+    switchToInternal();
+    initialized = true;
+    if (Serial) Serial.printf("[%lu] [SD] using internal flash storage\n", millis());
+    runBootSelfTest();
+    return true;
+  }
+
+  initialized = false;
+  return false;
+}
+
+void SDCardManager::switchToInternal() {
+  // FsVolume::begin() already published this volume as the current working
+  // volume, so callers that use SdFat's global seam see it too. All our own
+  // call sites go through vol(), which follows the flag below.
+  usingInternal = true;
+}
+
+bool SDCardManager::beginInternal() {
+  // SdFat's FAT formatter refuses volumes <= 6 MB ("Card is too small"), so the
+  // 3.4 MB `spiffs` partition is unusable as-is. app1 — the OTA backup slot,
+  // 6.25 MB, currently all 0xFF and never booted (otadata still selects app0) —
+  // is the right host for the internal store. NOTE: in-device OTA is therefore
+  // not usable while internal storage is in play; flash over USB instead.
+  const esp_partition_t* part =
+      esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, nullptr);
+  if (part == nullptr) {
+    part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+  }
+  if (part == nullptr || part->size <= 6u * 1024u * 1024u) {
+    if (Serial) Serial.printf("[SD] no usable internal storage partition (need > 6MB)\n");
+    return false;
+  }
+  if (!internalDev.begin(part)) {
+    return false;
+  }
+
+  // Try existing FAT first (fast path on every boot after the first).
+  if (internalVol.begin(&internalDev)) {
+    return true;
+  }
+
+  // Not formatted yet: format once, then mount.
+  if (Serial) Serial.println("[SD] formatting internal storage...");
+  uint8_t* work = static_cast<uint8_t*>(malloc(4096));
+  if (work == nullptr) {
+    return false;
+  }
+  FatFormatter formatter;
+  const bool formatted = formatter.format(&internalDev, work);
+  free(work);
+  if (!formatted) {
+    if (Serial) Serial.println("[SD] internal storage format failed");
+    return false;
+  }
+  if (!internalVol.begin(&internalDev)) {
+    if (Serial) Serial.println("[SD] internal storage mount failed after format");
+    return false;
+  }
+  return true;
+}
+
+void SDCardManager::runBootSelfTest() {
+  if (!Serial) return;
+  constexpr const char* kMarker = "/.selftest_done";
+  if (exists(kMarker)) {
+    Serial.println("[SD] selftest previously passed (marker present)");
+    return;
+  }
+  constexpr const char* kPath = "/selftest.txt";
+  const String payload = "onepage-internal-storage-ok";
+  const bool wrote = writeFile(kPath, payload);
+  const String readBack = readFile(kPath);
+  const bool match = (readBack == payload);
+  const unsigned entries = static_cast<unsigned>(listFiles("/", 20).size());
+  Serial.printf("[SD] SELFTEST write=%s read=%s match=%s rootEntries=%u => %s\n", wrote ? "ok" : "FAIL",
+                readBack.length() ? readBack.c_str() : "(empty)", match ? "ok" : "FAIL", entries,
+                (wrote && match) ? "PASS" : "FAIL");
+  if (wrote && match) {
+    // Persist the marker so the test runs once per format.
+    writeFile(kMarker, "ok");
+  }
 }
 
 bool SDCardManager::ready() const {
@@ -61,7 +149,7 @@ std::vector<String> SDCardManager::listFiles(const char* path, const int maxFile
     return ret;
   }
 
-  auto root = sd.open(path);
+  auto root = vol().open(path);
   if (!root) {
     if (Serial) Serial.printf("[%lu] [SD] Failed to open directory\n", millis());
     return ret;
@@ -181,8 +269,8 @@ bool SDCardManager::writeFile(const char* path, const String& content) {
   }
 
   // Remove existing file so we perform an overwrite rather than append
-  if (sd.exists(path)) {
-    sd.remove(path);
+  if (vol().exists(path)) {
+    vol().remove(path);
   }
 
   FsFile f;
@@ -203,8 +291,8 @@ bool SDCardManager::ensureDirectoryExists(const char* path) {
   }
 
   // Check if directory already exists
-  if (sd.exists(path)) {
-    FsFile dir = sd.open(path);
+  if (vol().exists(path)) {
+    FsFile dir = vol().open(path);
     if (dir && dir.isDirectory()) {
       dir.close();
       if (Serial) Serial.printf("Directory already exists: %s\n", path);
@@ -214,7 +302,7 @@ bool SDCardManager::ensureDirectoryExists(const char* path) {
   }
 
   // Create the directory
-  if (sd.mkdir(path)) {
+  if (vol().mkdir(path)) {
     if (Serial) Serial.printf("Created directory: %s\n", path);
     return true;
   } else {
@@ -224,12 +312,12 @@ bool SDCardManager::ensureDirectoryExists(const char* path) {
 }
 
 bool SDCardManager::openFileForRead(const char* moduleName, const char* path, FsFile& file) {
-  if (!sd.exists(path)) {
+  if (!vol().exists(path)) {
     if (Serial) Serial.printf("[%lu] [%s] File does not exist: %s\n", millis(), moduleName, path);
     return false;
   }
 
-  file = sd.open(path, O_RDONLY);
+  file = vol().open(path, O_RDONLY);
   if (!file) {
     if (Serial) Serial.printf("[%lu] [%s] Failed to open file for reading: %s\n", millis(), moduleName, path);
     return false;
@@ -246,7 +334,7 @@ bool SDCardManager::openFileForRead(const char* moduleName, const String& path, 
 }
 
 bool SDCardManager::openFileForWrite(const char* moduleName, const char* path, FsFile& file) {
-  file = sd.open(path, O_RDWR | O_CREAT | O_TRUNC);
+  file = vol().open(path, O_RDWR | O_CREAT | O_TRUNC);
   if (!file) {
     if (Serial) Serial.printf("[%lu] [%s] Failed to open file for writing: %s\n", millis(), moduleName, path);
     return false;
@@ -264,7 +352,7 @@ bool SDCardManager::openFileForWrite(const char* moduleName, const String& path,
 
 bool SDCardManager::removeDir(const char* path) {
   // 1. Open the directory
-  auto dir = sd.open(path);
+  auto dir = vol().open(path);
   if (!dir) {
     return false;
   }
@@ -287,12 +375,12 @@ bool SDCardManager::removeDir(const char* path) {
         return false;
       }
     } else {
-      if (!sd.remove(filePath.c_str())) {
+      if (!vol().remove(filePath.c_str())) {
         return false;
       }
     }
     file = dir.openNextFile();
   }
 
-  return sd.rmdir(path);
+  return vol().rmdir(path);
 }
