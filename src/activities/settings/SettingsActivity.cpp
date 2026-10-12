@@ -21,6 +21,7 @@
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
+#include "ReadflixActivity.h"
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
@@ -76,6 +77,9 @@ void SettingsActivity::rebuildSettingsLists() {
   // Insert "Manage Fonts" right after the font family setting so users discover it naturally
   readerSettings.insert(readerSettings.begin() + 1,
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
+  // Readflix book library lives next to the font browser as another remote source.
+  readerSettings.insert(readerSettings.begin() + 2,
+                        SettingInfo::Action(StrId::STR_OPDS_BROWSER, SettingAction::ReadflixDownload));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
 
   // Update currentSettings pointer and count for the active category
@@ -290,6 +294,10 @@ void SettingsActivity::toggleCurrentSetting() {
                                  SETTINGS.saveToFile();
                                  rebuildSettingsLists();
                                });
+        break;
+      case SettingAction::ReadflixDownload:
+        startActivityForResult(std::make_unique<ReadflixActivity>(renderer, mappedInput),
+                               [this](const ActivityResult&) { rebuildSettingsLists(); });
         break;
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
