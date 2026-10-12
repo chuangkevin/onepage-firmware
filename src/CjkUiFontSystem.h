@@ -19,6 +19,8 @@
 #include <EpdFontData.h>
 #include <SdCardFont.h>
 
+#include <memory>
+
 class SdCardFontRegistry;
 
 class CjkUiFontSystem {
@@ -29,13 +31,13 @@ class CjkUiFontSystem {
   CjkUiFontSystem& operator=(const CjkUiFontSystem&) = delete;
 
   // Load the UI CJK font. When `family` is non-empty and present in `registry`,
-  // load that family's file closest to `sizeEnum` (0..3 -> 12/14/16/18 pt);
-  // otherwise fall back to the built-in default candidate paths.
+  // load that family's file closest to the target point size `sizePt`; otherwise
+  // fall back to the built-in default candidate paths.
   // Safe to call more than once (no-op once loaded). Returns true on success;
   // logs a warning and returns false if no font file is present — callers must
   // tolerate this (UI simply shows replacement boxes for CJK).
   bool loadIfAvailable(const SdCardFontRegistry* registry = nullptr, const char* family = nullptr,
-                       uint8_t sizeEnum = 1);
+                       uint8_t sizePt = 14);
 
   // Wire the CJK fallback into the UI EpdFont objects. Must be called after
   // loadIfAvailable() returned true. Copies each builtin EpdFontData into a
@@ -47,6 +49,11 @@ class CjkUiFontSystem {
 
   // Restore the original builtin EpdFontData pointers on the UI fonts.
   void detachFromUiFonts(EpdFont& ui10Reg, EpdFont& ui10Bold, EpdFont& ui12Reg, EpdFont& ui12Bold, EpdFont& small);
+
+  // Re-apply the UI font live: detach, drop the current file, reload from the
+  // new family/size, and re-attach. Called when the UI font setting changes so
+  // it takes effect immediately (no reboot). `sizePt` is a target point size.
+  void reload(const SdCardFontRegistry* registry, const char* family, uint8_t sizePt);
 
   bool isLoaded() const { return loaded_; }
   bool isAttached() const { return attached_; }
@@ -62,9 +69,18 @@ class CjkUiFontSystem {
       "/fonts/LXGWWenKai/LXGWWenKai_12.cpfont",
   };
 
-  SdCardFont font_;
+  // unique_ptr so reload() can drop the current file and load a new one
+  // (SdCardFont is non-copyable / non-movable).
+  std::unique_ptr<SdCardFont> font_;
   bool loaded_ = false;
   bool attached_ = false;
+
+  // Stored at attach time so reload() can re-attach the same EpdFont objects.
+  EpdFont* ui10RegPtr_ = nullptr;
+  EpdFont* ui10BoldPtr_ = nullptr;
+  EpdFont* ui12RegPtr_ = nullptr;
+  EpdFont* ui12BoldPtr_ = nullptr;
+  EpdFont* smallPtr_ = nullptr;
 
   // Mutable EpdFontData copies (BSS, ~144B x4 in DRAM). All const pointer
   // members still reference the builtin flash arrays; only glyphMissHandler /

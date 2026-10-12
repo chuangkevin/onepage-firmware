@@ -151,6 +151,7 @@ bool JsonSettingsIO::saveSettings(const CrossPointSettings& s, const char* path)
   // UI CJK font family — dynamic SettingsList entry, save manually too
   if (s.uiFontFamilyName[0] != '\0') {
     doc["uiFontFamilyName"] = s.uiFontFamilyName;
+    doc["uiFontSize"] = s.uiFontSize;
   }
 
   // Language -- managed by LanguageSelectActivity, not in SettingsList.
@@ -281,6 +282,7 @@ bool JsonSettingsIO::loadSettings(CrossPointSettings& s, const char* json, bool*
   const char* uiff = doc["uiFontFamilyName"] | "";
   strncpy(s.uiFontFamilyName, uiff, sizeof(s.uiFontFamilyName) - 1);
   s.uiFontFamilyName[sizeof(s.uiFontFamilyName) - 1] = '\0';
+  s.uiFontSize = doc["uiFontSize"] | (uint8_t)14;
   if (storedFontFamily == CrossPointSettings::LEGACY_OPENDYSLEXIC && s.sdFontFamilyName[0] == '\0') {
     s.fontFamily = CrossPointSettings::NOTOSERIF;
     strncpy(s.sdFontFamilyName, "OpenDyslexic", sizeof(s.sdFontFamilyName) - 1);

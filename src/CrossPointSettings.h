@@ -25,6 +25,7 @@ class CrossPointSettings {
     BLANK = 4,
     COVER_CUSTOM = 5,
     QUICK_RESUME = 6,
+    NAMEPLATE = 7,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
@@ -176,6 +177,9 @@ class CrossPointSettings {
 
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
+  // Nameplate (名牌) sleep screen image rotation, same enum order as ORIENTATION
+  // (0=portrait, 1=landscape CW, 2=inverted, 3=landscape CCW).
+  uint8_t nameplateOrientation = 0;
   // Sleep screen cover mode settings
   uint8_t sleepScreenCoverMode = FIT;
   // Sleep screen cover filter
@@ -268,8 +272,9 @@ class CrossPointSettings {
   // Loaded by CjkUiFontSystem at boot; lets the user change the UI font on-device
   // without swapping the SD card.
   char uiFontFamilyName[32] = "";
-  // UI CJK font size: 0=Small 1=Medium 2=Large 3=XLarge -> 12/14/16/18 pt
-  uint8_t uiFontSize = 1;
+  // UI CJK font point size (target; CjkUiFontSystem picks the closest installed
+  // size of uiFontFamilyName). Ignored while uiFontFamilyName is empty.
+  uint8_t uiFontSize = 14;
   // Show hidden files/directories (starting with '.') in the file browser (0 = hidden, 1 = show)
   uint8_t showHiddenFiles = 0;
   // Remove a book from the Recent Books list when its End-of-Book screen is reached (0 = off, 1 = on)

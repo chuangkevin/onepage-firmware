@@ -18,6 +18,7 @@
 #include "WebDAVHandler.h"
 #include "WifiCredentialStore.h"
 #include "html/FilesPageHtml.generated.h"
+#include "html/BadgePageHtml.generated.h"
 #include "html/FontsPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
@@ -161,6 +162,7 @@ void CrossPointWebServer::begin() {
 
   // Font management endpoints
   server->on("/fonts", HTTP_GET, [this] { handleFontsPage(); });
+  server->on("/badge", HTTP_GET, [this] { handleBadgePage(); });
   server->on("/api/fonts", HTTP_GET, [this] { handleFontList(); });
   server->on("/api/fonts/upload", HTTP_POST, [this] { handleFontUpload(); }, [this] { handleFontUploadData(); });
   server->on("/api/fonts/delete", HTTP_POST, [this] { handleFontDelete(); });
@@ -1713,6 +1715,11 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
 void CrossPointWebServer::handleFontsPage() const {
   sendHtmlContent(server.get(), FontsPageHtml, sizeof(FontsPageHtml));
   LOG_DBG("WEB", "Served fonts page");
+}
+
+void CrossPointWebServer::handleBadgePage() const {
+  sendHtmlContent(server.get(), BadgePageHtml, sizeof(BadgePageHtml));
+  LOG_DBG("WEB", "Served badge page");
 }
 
 void CrossPointWebServer::handleFontList() const {

@@ -519,8 +519,8 @@ enum class StrId : uint16_t {
   STR_READFLIX,
   STR_TAILSCALE_LOGIN,
   STR_UI_FONT,
-  STR_UI_FONT_SIZE,
   STR_UI_FONT_DEFAULT,
+  STR_NAMEPLATE,
   // Sentinel - must be last
   _COUNT
 };

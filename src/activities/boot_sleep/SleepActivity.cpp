@@ -42,6 +42,8 @@ void SleepActivity::onEnter() {
       return renderBlankSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM):
       return renderCustomSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::NAMEPLATE):
+      return renderNameplateSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER):
       return renderCoverSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
@@ -146,6 +148,24 @@ void SleepActivity::renderCustomSleepScreen() const {
   }
   if (dir) dir.close();
 
+  renderDefaultSleepScreen();
+}
+
+void SleepActivity::renderNameplateSleepScreen() const {
+  // Dedicated nameplate image uploaded from the web "名牌" page.
+  HalFile file;
+  if (Storage.openFileForRead("SLP", "/.crosspoint/badge.bmp", file)) {
+    Bitmap bitmap(file, true);
+    if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+      const auto prev = renderer.getOrientation();
+      renderer.setOrientation(static_cast<GfxRenderer::Orientation>(SETTINGS.nameplateOrientation));
+      renderBitmapSleepScreen(bitmap);
+      renderer.setOrientation(prev);
+      file.close();
+      return;
+    }
+    file.close();
+  }
   renderDefaultSleepScreen();
 }
 

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>名牌製作</title>
+<style>
+:root{color-scheme:light;font-family:"PingFang TC","Noto Sans TC",system-ui,sans-serif;color:#1F2937;background:#FFFBF7}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;font-size:16px;line-height:1.6}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.card{background:#fff;border:1px solid #E7DDD0;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+h3{margin:0;font-size:18px}
+input,button,select{font:inherit;font-size:16px;border:1px solid #E7DDD0;border-radius:10px;padding:8px 12px;background:#FFF7ED;color:#1F2937}
+button{cursor:pointer}
+button.primary{background:#F97316;border-color:#F97316;color:#111;font-weight:700}
+button:disabled{opacity:.5}
+canvas{width:100%;height:auto;border:1px solid #E7DDD0;border-radius:8px;background:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.small{font-size:13px;color:#6B7280;margin:0}
+#status:empty{display:none}
+</style>
+<div class="wrap">
+  <div class="card">
+    <h3>名牌製作</h3>
+    <p class="small">上傳一張照片、填姓名／職稱，產生 800×480 的黑白名牌，下載到裝置當待機畫面。</p>
+  </div>
+  <div class="card">
+    <div class="row"><button id="tabPhoto" class="primary">照片</button><button id="tabText">純文字</button></div>
+    <label>照片 <input type="file" id="photo" accept="image/*"></label>
+    <label>姓名 <input id="name" maxlength="12" placeholder="你的名字"></label>
+    <label>職稱 <input id="title" maxlength="20" placeholder="職稱"></label>
+    <label class="row">顯示照片 <input type="checkbox" id="showPhoto" checked></label>
+  </div>
+  <div class="card">
+    <canvas id="cv" width="800" height="480"></canvas>
+    <div class="row">
+      <button id="render">產生預覽</button>
+      <button id="save" class="primary">存到裝置（待機名牌）</button>
+    </div>
+    <p class="small">存到裝置後，到裝置：<b>設定 → 顯示 → 休眠屏幕</b> 選 <b>名牌</b>（方向也在同頁設定）。</p>
+    <p id="status" class="small"></p>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let photoImg = null;
+let mode = 'photo';
+
+function tab(m){ mode = m; document.getElementById('tabPhoto').classList.toggle('primary', m==='photo');
+  document.getElementById('tabText').classList.toggle('primary', m==='text'); render(); }
+document.getElementById('tabPhoto').onclick=()=>tab('photo');
+document.getElementById('tabText').onclick=()=>tab('text');
+
+document.getElementById('photo').onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  const img = new Image();
+  img.onload = () => { photoImg = img; render(); };
+  img.src = URL.createObjectURL(f);
+};
+document.getElementById('render').onclick = render;
+document.getElementById('save').onclick = save;
+
+function render(){
+  const W=800,H=480;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  const name=(document.getElementById('name').value||'').trim();
+  const title=(document.getElementById('title').value||'').trim();
+  const showPhoto=document.getElementById('showPhoto').checked && photoImg && mode!=='text';
+
+  // photo area (left), text (right) when a photo is shown
+  if (showPhoto){
+    const pw=380, ph=380, px=40, py=(H-ph)/2;
+    drawCover(photoImg, px, py, pw, ph);
+    // text block right
+    ctx.fillStyle='#000';
+    drawFit(name||' ', 520, 190, H-140, 96, '700');
+    ctx.fillStyle='#333';
+    drawFit(title||' ', 520, 300, H-140, 40, '500');
+  } else {
+    // centered text only
+    ctx.fillStyle='#000';
+    drawFit(name||' ', 40, H/2-60, W-80, 120, '700');
+    ctx.fillStyle='#333';
+    drawFit(title||' ', 40, H/2+40, W-80, 48, '500');
+  }
+  // grayscale + threshold (simple, deterministic)
+  const id=ctx.getImageData(0,0,W,H), d=id.data;
+  for(let i=0;i<d.length;i+=4){ const g=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114); const v=g>=140?255:0; d[i]=d[i+1]=d[i+2]=v; }
+  ctx.putImageData(id,0,0);
+}
+
+function drawCover(img, x,y,w,h){
+  const r=img.width/img.height, R=w/h; let dw,dh,dx,dy;
+  if(r>R){ dh=h; dw=h*r; dx=x-(dw-w)/2; dy=y; } else { dw=w; dh=w/r; dx=x; dy=y-(dh-h)/2; }
+  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); ctx.drawImage(img,dx,dy,dw,dh); ctx.restore();
+}
+function drawFit(text,x,y,maxW,maxH,weight){
+  let size=maxH; ctx.textBaseline='top';
+  do { ctx.font=weight+' '+size+'px "PingFang TC","Noto Sans TC",sans-serif'; if(ctx.measureText(text).width<=maxW) break; size-=2; } while(size>10);
+  ctx.fillText(text,x,y);
+}
+
+function makeBmp(){
+  const W=800,H=480,rowBytes=100; // 800px/8 = 100, already 4-byte aligned
+  const dataSize=rowBytes*H, fileSize=14+40+8+dataSize;
+  const buf=new ArrayBuffer(fileSize), dv=new DataView(buf), u8=new Uint8Array(buf);
+  dv.setUint16(0,0x4D42,true); dv.setUint32(2,fileSize,true); dv.setUint32(10,62,true); // pixel offset 54+8
+  dv.setUint32(14,40,true); dv.setInt32(18,W,true); dv.setInt32(22,H,true);
+  dv.setUint16(26,1,true); dv.setUint16(28,1,true); dv.setUint32(30,0,true); dv.setUint32(34,dataSize,true);
+  dv.setUint32(38,2835,true); dv.setUint32(42,2835,true); dv.setUint32(46,2,true); dv.setUint32(50,2,true);
+  // palette: 0=black, 1=white (BGRA)
+  u8[54]=0;u8[55]=0;u8[56]=0;u8[57]=0; u8[58]=255;u8[59]=255;u8[60]=255;u8[61]=0;
+  const img=ctx.getImageData(0,0,W,H).data;
+  let p=62;
+  for(let row=H-1; row>=0; row--){        // bottom-up
+    for(let bx=0; bx<rowBytes; bx++){
+      let byte=0;
+      for(let b=0;b<8;b++){
+        const x=bx*8+b;
+        const i=(row*W+x)*4;
+        const bit = img[i] < 128 ? 0 : 1;   // black=0, white=1
+        byte |= (bit<<(7-b));
+      }
+      u8[p++]=byte;
+    }
+  }
+  return new Blob([buf],{type:'image/bmp'});
+}
+
+async function save(){
+  render();
+  const blob=makeBmp();
+  const fd=new FormData();
+  fd.append('file', blob, 'badge.bmp');
+  setStatus('上傳中…');
+  try{
+    const r=await fetch('/upload?path=/.crosspoint',{method:'POST',body:fd});
+    if(!r.ok) throw new Error(await r.text());
+    setStatus('已存到 /.crosspoint/badge.bmp ✔ 到裝置設定選「名牌」即可看到。');
+  }catch(e){ setStatus('上傳失敗：'+e.message); }
+}
+function setStatus(t){ document.getElementById('status').textContent=t; }
+render();
+</script>
+</html>

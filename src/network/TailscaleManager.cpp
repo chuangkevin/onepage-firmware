@@ -53,8 +53,15 @@ bool TailscaleManager::loadConfig() {
   if (configured_) return true;
 
   if (!Storage.exists(TS_CONFIG_PATH)) {
-    LOG_DBG("TS", "no %s; tailnet disabled", TS_CONFIG_PATH);
-    return false;
+    // No config file: default to ENABLED in interactive QR-login mode so the
+    // login screen works out of the box (no need to drop a file on the SD
+    // card). The file is only needed to set a non-interactive authKey or to
+    // disable the overlay. MicroLink/NVS persists the identity after login.
+    authKey_.clear();
+    hostname_ = "onepage";
+    configured_ = true;
+    LOG_INF("TS", "no %s; using interactive QR login (default hostname 'onepage')", TS_CONFIG_PATH);
+    return true;
   }
 
   const String json = Storage.readFile(TS_CONFIG_PATH);

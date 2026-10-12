@@ -22,6 +22,7 @@
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
 #include "ReadflixActivity.h"
+#include "CjkUiFontSystem.h"
 #include "TailscaleLoginActivity.h"
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
@@ -125,6 +126,11 @@ void SettingsActivity::onExit() {
   Activity::onExit();
 
   UITheme::getInstance().reload();  // Re-apply theme in case it was changed
+#ifdef ONEPAGE_C61
+  // Re-apply the UI CJK font live (family + size), so a change here takes
+  // effect immediately instead of only after the next boot.
+  cjkUiFontSystem.reload(&sdFontSystem.registry(), SETTINGS.uiFontFamilyName, SETTINGS.uiFontSize);
+#endif
 }
 
 void SettingsActivity::loop() {

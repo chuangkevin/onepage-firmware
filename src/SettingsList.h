@@ -90,18 +90,23 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   return s;
 }
 
-// Build the UI (menu/interface) CJK font-family setting. Mirrors the reader
-// font-family picker but writes SETTINGS.uiFontFamilyName (empty = built-in
-// default path). Lets the user change the UI font on-device without swapping
-// the SD card.
-inline SettingInfo buildUiFontFamilySetting(const SdCardFontRegistry* registry) {
+// Build the UI (menu/interface) CJK font picker: one list of "Default" plus
+// every installed SD font FILE ("<Family> <size>"). Picking one sets both the
+// family and the point size so a size change always has a target to load.
+inline SettingInfo buildUiFontSetting(const SdCardFontRegistry* registry) {
+  struct Pick {
+    std::string family;
+    uint8_t pt;
+  };
   std::vector<std::string> labels;
-  std::vector<std::string> familyNames;
-  labels.push_back(I18N.get(StrId::STR_UI_FONT_DEFAULT));
+  std::vector<Pick> picks;
+  labels.push_back(I18N.get(StrId::STR_UI_FONT_DEFAULT));  // index 0 = default path
   if (registry) {
     for (const auto& f : registry->getFamilies()) {
-      labels.push_back(f.name);
-      familyNames.push_back(f.name);
+      for (const auto& file : f.files) {
+        labels.push_back(f.name + " " + std::to_string(file.pointSize));
+        picks.push_back({f.name, file.pointSize});
+      }
     }
   }
 
@@ -112,22 +117,24 @@ inline SettingInfo buildUiFontFamilySetting(const SdCardFontRegistry* registry) 
   s.key = "uiFontFamily";
   s.category = StrId::STR_CAT_DISPLAY;
 
-  s.valueGetter = [familyNames]() -> uint8_t {
+  s.valueGetter = [picks]() -> uint8_t {
     if (SETTINGS.uiFontFamilyName[0] != '\0') {
-      for (int i = 0; i < static_cast<int>(familyNames.size()); i++) {
-        if (familyNames[i] == SETTINGS.uiFontFamilyName) {
+      for (int i = 0; i < static_cast<int>(picks.size()); i++) {
+        if (picks[i].family == SETTINGS.uiFontFamilyName && picks[i].pt == SETTINGS.uiFontSize) {
           return static_cast<uint8_t>(i + 1);
         }
       }
     }
     return 0;
   };
-  s.valueSetter = [familyNames](uint8_t v) {
-    if (v == 0 || v - 1 >= static_cast<int>(familyNames.size())) {
+  s.valueSetter = [picks](uint8_t v) {
+    if (v == 0 || v - 1 >= static_cast<int>(picks.size())) {
       SETTINGS.uiFontFamilyName[0] = '\0';
     } else {
-      strncpy(SETTINGS.uiFontFamilyName, familyNames[v - 1].c_str(), sizeof(SETTINGS.uiFontFamilyName) - 1);
+      const Pick& p = picks[v - 1];
+      strncpy(SETTINGS.uiFontFamilyName, p.family.c_str(), sizeof(SETTINGS.uiFontFamilyName) - 1);
       SETTINGS.uiFontFamilyName[sizeof(SETTINGS.uiFontFamilyName) - 1] = '\0';
+      SETTINGS.uiFontSize = p.pt;
     }
   };
   return s;
@@ -148,8 +155,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         // --- Display ---
         SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
                           {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER, StrId::STR_NONE_OPT,
-                           StrId::STR_COVER_CUSTOM, StrId::STR_QUICK_RESUME},
+                           StrId::STR_COVER_CUSTOM, StrId::STR_QUICK_RESUME, StrId::STR_NAMEPLATE},
                           "sleepScreen", StrId::STR_CAT_DISPLAY),
+        SettingInfo::Enum(StrId::STR_ORIENTATION, &CrossPointSettings::nameplateOrientation,
+                          {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
+                           StrId::STR_LANDSCAPE_CCW},
+                          "nameplateOrientation", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
                           {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
@@ -171,12 +182,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           "uiTheme", StrId::STR_CAT_DISPLAY),
         SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
                             StrId::STR_CAT_DISPLAY),
-        // UI (menu/interface) CJK font size. The UI font FAMILY entry is inserted
-        // dynamically in getSettingsList() when SD fonts are present (see
-        // buildUiFontFamilySetting). Both apply on next boot.
-        SettingInfo::Enum(StrId::STR_UI_FONT_SIZE, &CrossPointSettings::uiFontSize,
-                          {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE}, "uiFontSize",
-                          StrId::STR_CAT_DISPLAY),
+        // (UI font family + size is inserted dynamically in getSettingsList()
+        //  as a single picker; see buildUiFontSetting().)
 
         // --- Reader ---
         // Built-in font-family entry. Replaced per-call with a registry-aware
@@ -342,11 +349,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     if (it != v.end()) {
       *it = buildFontFamilySetting(registry);
     }
-    // Insert the UI font-family picker right before the UI font-size entry.
-    auto itu = std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_UI_FONT_SIZE; });
-    if (itu != v.end()) {
-      v.insert(itu, buildUiFontFamilySetting(registry));
-    }
+  }
+  // Insert the UI (menu/interface) font picker (family + size) at the end of
+  // the Display section. Always present (shows at least "Default").
+  auto itd =
+      std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_SUNLIGHT_FADING_FIX; });
+  if (itd != v.end()) {
+    v.insert(itd + 1, buildUiFontSetting(registry));
   }
   return v;
 }
