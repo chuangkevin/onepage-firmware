@@ -617,10 +617,12 @@ void EInkDisplay::waitForRefresh(const char *comment) {
 void EInkDisplay::pollBusy(const char *comment, const char *completeWord) {
   unsigned long start = millis();
   if (!_x3Mode) {
-    // X4: BUSY held HIGH while busy, drops LOW when done.
+    // X4: BUSY held HIGH while busy, drops LOW when done. Timeout is bounded
+    // (5s) so a wedged panel (SD/EPD share the SPI bus + the GPIO27 power/reset
+    // rail) can't freeze the UI for 30s; the next refresh recovers.
     while (digitalRead(_busy) == HIGH) {
       delay(1);
-      if (millis() - start > 30000)
+      if (millis() - start > 5000)
         break;
     }
   } else {
@@ -642,7 +644,7 @@ void EInkDisplay::pollBusy(const char *comment, const char *completeWord) {
       sawLow = true;
       while (digitalRead(_busy) == LOW) {
         delay(1);
-        if (millis() - start > 30000)
+        if (millis() - start > 5000)
           break;
       }
     }
