@@ -75,9 +75,12 @@ void TailscaleLoginActivity::render(RenderLock&&) {
     const int side = (qrSize < pageWidth - 40) ? qrSize : pageWidth - 40;
     QrUtils::drawQrCode(renderer, Rect{(pageWidth - side) / 2, qrTop, side, side}, url);
     renderer.drawCenteredText(UI_10_FONT_ID, qrTop + side + metrics.verticalSpacing, url.c_str());
+  } else if (ts.isFailed()) {
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY, "Tailscale 啟動失敗", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + lineHeight * 2, "（記憶體不足）請重開機後再試");
   } else {
     renderer.drawCenteredText(UI_10_FONT_ID, centerY, "正在連線 Tailscale…");
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY + lineHeight * 2, "請先連上 Wi-Fi，稍候會出現 QR");
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + lineHeight * 2, "請稍候…");
   }
 
   const auto labels = mappedInput.mapLabels("返回", "", "", "");

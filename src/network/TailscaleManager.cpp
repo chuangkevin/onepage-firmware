@@ -131,6 +131,7 @@ void TailscaleManager::run() {
   if (ml == nullptr) {
     LOG_ERR("TS", "microlink_init failed");
     starting_ = false;
+    failed_ = true;
     return;
   }
   ml_ = ml;
@@ -142,6 +143,7 @@ void TailscaleManager::run() {
   if (err != ESP_OK) {
     LOG_ERR("TS", "microlink_start failed: %d", static_cast<int>(err));
     starting_ = false;
+    failed_ = true;
     return;
   }
 

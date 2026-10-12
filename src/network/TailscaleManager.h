@@ -34,6 +34,9 @@ class TailscaleManager {
   // True while MicroLink reports the tailnet is connected.
   bool isUp() const;
 
+  // True once a bring-up attempt failed (e.g. OOM / task create failure).
+  bool isFailed() const { return failed_; }
+
   // The Tailscale interactive login URL, when the control plane has issued one.
   // Only happens in QR/interactive mode (no authKey configured). Empty string
   // when none is available yet or the device is already authorised.
@@ -48,6 +51,7 @@ class TailscaleManager {
   bool configured_ = false;
   bool starting_ = false;
   bool started_ = false;
+  bool failed_ = false;
 
   std::string authKey_;
   std::string hostname_;
