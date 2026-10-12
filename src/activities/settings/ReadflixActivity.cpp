@@ -65,6 +65,17 @@ void ReadflixActivity::onWifiSelectionComplete(const bool success) {
   }
   requestUpdateAndWait();
 
+  // Readflix is only reachable over the tailnet, and MicroLink's register +
+  // connect can take ~30s; the old code raced it and always failed with
+  // ESP_ERR_HTTP_CONNECT. Wait here (or for a hard failure) before fetching.
+  {
+    auto& ts = TailscaleManager::instance();
+    for (int i = 0; i < 80 && !ts.isUp() && !ts.isFailed(); i++) {
+      delay(500);
+      requestUpdate();
+    }
+  }
+
   if (!fetchAndParseBooks()) {
     {
       RenderLock lock(*this);
