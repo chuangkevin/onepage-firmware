@@ -77,7 +77,7 @@ void TailscaleLoginActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, qrTop + side + metrics.verticalSpacing, url.c_str());
   } else {
     renderer.drawCenteredText(UI_10_FONT_ID, centerY, "正在連線 Tailscale…");
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY + lineHeight * 2, "（需要：內建儲存有 /.crosspoint/tailscale.json）");
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + lineHeight * 2, "請先連上 Wi-Fi，稍候會出現 QR");
   }
 
   const auto labels = mappedInput.mapLabels("返回", "", "", "");
