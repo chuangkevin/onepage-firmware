@@ -45,6 +45,13 @@ typedef struct {
     uint32_t disco_heartbeat_ms;    /* DISCO keepalive interval (default: 3000) */
     uint32_t stun_interval_ms;      /* STUN re-probe interval (default: 23000) */
     uint32_t ctrl_watchdog_ms;      /* Control plane watchdog timeout (default: 120000) */
+
+    /* OUTPUT (written by MicroLink, not read from the caller) — when the device
+     * registers without an auth key, Tailscale's /machine/register response
+     * contains an interactive login URL. MicroLink copies it here so the app can
+     * render it as a QR code and the user logs in from their phone. Empty string
+     * when no login is required. Read via microlink_get_login_url(). */
+    char login_url[256];
 } microlink_config_t;
 
 /* Peer info (read-only snapshot) */
@@ -152,6 +159,20 @@ bool microlink_is_connected(const microlink_t *ml);
  * @return VPN IP in host byte order, 0 if not yet assigned
  */
 uint32_t microlink_get_vpn_ip(const microlink_t *ml);
+
+/**
+ * @brief Get the interactive Tailscale login URL, if one was issued
+ * @param ml Handle (NULL-safe)
+ * @return NUL-terminated URL (e.g. "https://login.tailscale.com/a/xxxx"),
+ *         or "" when no interactive login is pending.
+ *
+ * Populated when the control plane's /machine/register response contains an
+ * "authURL" (which happens when the device registered without an auth key and
+ * still needs the user to approve/log in). Render it as a QR code and have the
+ * user complete login from their phone. The string is owned by MicroLink and
+ * is valid until the next register/reconnect; do NOT free it.
+ */
+const char *microlink_get_login_url(const microlink_t *ml);
 
 /**
  * @brief Get number of known peers

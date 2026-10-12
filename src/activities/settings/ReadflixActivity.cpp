@@ -15,6 +15,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
+#include "network/TailscaleManager.h"
 #include "util/StringUtils.h"
 
 namespace {
@@ -52,6 +53,11 @@ void ReadflixActivity::onWifiSelectionComplete(const bool success) {
     finish();
     return;
   }
+
+  // readflix is only reachable over the tailnet: bring Tailscale up now that
+  // Wi-Fi is connected and before the first HTTP request. No-op without a
+  // /.crosspoint/tailscale.json config.
+  TailscaleManager::instance().ensureUp();
 
   {
     RenderLock lock(*this);

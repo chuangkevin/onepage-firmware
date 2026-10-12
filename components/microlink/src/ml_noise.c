@@ -17,9 +17,15 @@
 #include "microlink_internal.h"
 #include "esp_log.h"
 #include "esp_random.h"
-#include "mbedtls/chacha20.h"
-#include "mbedtls/chachapoly.h"
 #include <string.h>
+
+/* ChaCha20-Poly1305 AEAD from wireguard-lwip's portable C backend
+ * (crypto/refc). MicroLink already links this software implementation for its
+ * WireGuard layer, so the Noise handshake reuses it instead of mbedTLS's
+ * chachapoly module — which the prebuilt arduino-esp32 libs ship with
+ * ChaChaPoly compiled out (CONFIG_MBEDTLS_CHACHAPOLY_C only affects a source
+ * rebuild, not the prebuilt libmbedcrypto.a). */
+#include "chacha20poly1305.h"
 
 static const char *TAG = "ml_noise";
 
@@ -149,68 +155,34 @@ static void noise_mix_key(uint8_t ck[32], uint8_t k[32], const uint8_t *dh_outpu
  * ChaCha20-Poly1305 AEAD (Noise uses 64-bit nonce, padded to 96-bit)
  * ========================================================================== */
 
-static int chacha20poly1305_encrypt(const uint8_t *key, uint64_t nonce,
+static int ml_aead_encrypt(const uint8_t *key, uint64_t nonce,
                                       const uint8_t *ad, size_t ad_len,
                                       const uint8_t *plaintext, size_t pt_len,
                                       uint8_t *ciphertext) {
     /* Tailscale nonce: 4 bytes zeros + 8 bytes BIG-endian counter
      * Matches Go: binary.BigEndian.PutUint64(n[4:], counter)
-     * V1 uses __builtin_bswap64 for the same effect */
-    uint8_t nonce_bytes[12];
-    memset(nonce_bytes, 0, 4);
-    nonce_bytes[4]  = (nonce >> 56) & 0xFF;
-    nonce_bytes[5]  = (nonce >> 48) & 0xFF;
-    nonce_bytes[6]  = (nonce >> 40) & 0xFF;
-    nonce_bytes[7]  = (nonce >> 32) & 0xFF;
-    nonce_bytes[8]  = (nonce >> 24) & 0xFF;
-    nonce_bytes[9]  = (nonce >> 16) & 0xFF;
-    nonce_bytes[10] = (nonce >> 8) & 0xFF;
-    nonce_bytes[11] = nonce & 0xFF;
-
-    mbedtls_chachapoly_context ctx;
-    mbedtls_chachapoly_init(&ctx);
-    mbedtls_chachapoly_setkey(&ctx, key);
-
-    /* ciphertext layout: encrypted_data(pt_len) + tag(16) */
-    int ret = mbedtls_chachapoly_encrypt_and_tag(&ctx,
-                pt_len, nonce_bytes, ad, ad_len,
-                plaintext, ciphertext, ciphertext + pt_len);
-
-    mbedtls_chachapoly_free(&ctx);
-    return ret;
+     *
+     * wireguard-lwip's refc AEAD takes the counter as a uint64 and serialises
+     * the 12-byte nonce as 4 zero bytes + 8-byte LITTLE-endian counter, so we
+     * byte-swap to reproduce Tailscale's big-endian wire nonce exactly. */
+    chacha20poly1305_encrypt(ciphertext, plaintext, pt_len, ad, ad_len,
+                             __builtin_bswap64(nonce), key);
+    return 0;
 }
 
-static int chacha20poly1305_decrypt(const uint8_t *key, uint64_t nonce,
+static int ml_aead_decrypt(const uint8_t *key, uint64_t nonce,
                                       const uint8_t *ad, size_t ad_len,
                                       const uint8_t *ciphertext, size_t ct_len,
                                       uint8_t *plaintext) {
     if (ct_len < 16) return -1;
 
-    /* Tailscale nonce: 4 bytes zeros + 8 bytes BIG-endian counter */
-    uint8_t nonce_bytes[12];
-    memset(nonce_bytes, 0, 4);
-    nonce_bytes[4]  = (nonce >> 56) & 0xFF;
-    nonce_bytes[5]  = (nonce >> 48) & 0xFF;
-    nonce_bytes[6]  = (nonce >> 40) & 0xFF;
-    nonce_bytes[7]  = (nonce >> 32) & 0xFF;
-    nonce_bytes[8]  = (nonce >> 24) & 0xFF;
-    nonce_bytes[9]  = (nonce >> 16) & 0xFF;
-    nonce_bytes[10] = (nonce >> 8) & 0xFF;
-    nonce_bytes[11] = nonce & 0xFF;
-
-    size_t payload_len = ct_len - 16;
-    const uint8_t *tag = ciphertext + payload_len;
-
-    mbedtls_chachapoly_context ctx;
-    mbedtls_chachapoly_init(&ctx);
-    mbedtls_chachapoly_setkey(&ctx, key);
-
-    int ret = mbedtls_chachapoly_auth_decrypt(&ctx,
-                payload_len, nonce_bytes, ad, ad_len,
-                tag, ciphertext, plaintext);
-
-    mbedtls_chachapoly_free(&ctx);
-    return ret;
+    /* src_len includes the trailing 16-byte Poly1305 tag (payload + tag).
+     * Same big-endian nonce handling as ml_aead_encrypt above. */
+    if (!chacha20poly1305_decrypt(plaintext, ciphertext, ct_len, ad, ad_len,
+                                  __builtin_bswap64(nonce), key)) {
+        return -1;
+    }
+    return 0;
 }
 
 /* ============================================================================
@@ -292,7 +264,7 @@ esp_err_t ml_noise_write_msg1(ml_noise_state_t *state, uint8_t *out, size_t *out
     memset(dh_output, 0, 32);
 
     /* s: Encrypt and send static public key (32 + 16 MAC = 48 bytes) */
-    chacha20poly1305_encrypt(k, 0, state->h, 32,
+    ml_aead_encrypt(k, 0, state->h, 32,
                               state->local_static_public, 32,
                               out + pos);
     noise_mix_hash(state->h, out + pos, 48);
@@ -304,7 +276,7 @@ esp_err_t ml_noise_write_msg1(ml_noise_state_t *state, uint8_t *out, size_t *out
     memset(dh_output, 0, 32);
 
     /* Empty payload encrypted (just the 16-byte auth tag) */
-    chacha20poly1305_encrypt(k, 0, state->h, 32,
+    ml_aead_encrypt(k, 0, state->h, 32,
                               NULL, 0, out + pos);
     noise_mix_hash(state->h, out + pos, 16);
     pos += 16;
@@ -351,7 +323,7 @@ esp_err_t ml_noise_read_msg2(ml_noise_state_t *state, const uint8_t *msg, size_t
 
     /* Decrypt payload (should be empty for IK — just 16-byte auth tag) */
     size_t ciphertext_len = len - offset;
-    if (chacha20poly1305_decrypt(k, 0, state->h, 32,
+    if (ml_aead_decrypt(k, 0, state->h, 32,
                                   msg + offset, ciphertext_len,
                                   NULL) != 0) {
         ESP_LOGE(TAG, "Noise msg2 auth tag verification failed");
@@ -379,7 +351,7 @@ esp_err_t ml_noise_encrypt(const uint8_t *key, uint64_t nonce,
                             const uint8_t *ad, size_t ad_len,
                             const uint8_t *plaintext, size_t pt_len,
                             uint8_t *ciphertext) {
-    if (chacha20poly1305_encrypt(key, nonce, ad, ad_len,
+    if (ml_aead_encrypt(key, nonce, ad, ad_len,
                                   plaintext, pt_len, ciphertext) != 0) {
         ESP_LOGE(TAG, "Noise encrypt failed");
         return ESP_FAIL;
@@ -391,7 +363,7 @@ esp_err_t ml_noise_decrypt(const uint8_t *key, uint64_t nonce,
                             const uint8_t *ad, size_t ad_len,
                             const uint8_t *ciphertext, size_t ct_len,
                             uint8_t *plaintext) {
-    if (chacha20poly1305_decrypt(key, nonce, ad, ad_len,
+    if (ml_aead_decrypt(key, nonce, ad, ad_len,
                                   ciphertext, ct_len, plaintext) != 0) {
         ESP_LOGE(TAG, "Noise decrypt failed (nonce=%llu)", (unsigned long long)nonce);
         return ESP_ERR_INVALID_MAC;

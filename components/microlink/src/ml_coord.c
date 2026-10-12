@@ -43,6 +43,15 @@ static const char *TAG = "ml_coord";
 static uint8_t s_node_key_challenge[32] = {0};
 static bool s_has_node_key_challenge = false;
 
+/* ============================================================================
+ * Public: interactive login URL (set during REGISTER when no auth key is used)
+ * ========================================================================== */
+
+const char *microlink_get_login_url(const microlink_t *ml) {
+    if (!ml) return "";
+    return (const char *)ml->config.login_url;
+}
+
 /* Coordination state machine */
 typedef enum {
     COORD_IDLE,
@@ -703,11 +712,15 @@ static int do_register(microlink_t *ml, ml_noise_state_t *noise) {
     snprintf(key_str, sizeof(key_str), "nodekey:%s", key_hex);
     cJSON_AddStringToObject(root, "NodeKey", key_str);
 
-    /* Auth - only include if auth_key is valid (matching v1 behavior) */
+    /* Auth - only include if auth_key is valid (matching v1 behavior).
+     * With an empty auth key we deliberately omit Auth and rely on the
+     * interactive login flow: the RegisterResponse then carries an authURL. */
     if (ml->config.auth_key && strlen(ml->config.auth_key) > 0) {
         cJSON *auth = cJSON_CreateObject();
         cJSON_AddStringToObject(auth, "AuthKey", ml->config.auth_key);
         cJSON_AddItemToObject(root, "Auth", auth);
+    } else {
+        ESP_LOGW(TAG, "No auth key configured — requesting interactive login (expecting authURL)");
     }
 
     /* Hostinfo */
@@ -994,6 +1007,23 @@ static int do_register(microlink_t *ml, ml_noise_state_t *noise) {
             char our_key_hex[65];
             bytes_to_hex(ml->wg_public_key, 32, our_key_hex);
             ESP_LOGI(TAG, "Our WG pubkey (local):       nodekey:%s", our_key_hex);
+        }
+    }
+
+    /* Interactive login (no auth key): Tailscale returns an "authURL" that the
+     * user opens on their phone to authorise this device. Copy it into the
+     * instance so the app can show a QR code. Absent field => behaves as before. */
+    {
+        cJSON *auth_url = cJSON_GetObjectItem(resp_json, "authURL");
+        if (auth_url && cJSON_IsString(auth_url) && auth_url->valuestring &&
+            auth_url->valuestring[0]) {
+            strncpy(ml->config.login_url, auth_url->valuestring,
+                    sizeof(ml->config.login_url) - 1);
+            ml->config.login_url[sizeof(ml->config.login_url) - 1] = '\0';
+            ESP_LOGW(TAG, "Not authorised yet — open this URL to log in: %s",
+                     ml->config.login_url);
+        } else {
+            ml->config.login_url[0] = '\0';
         }
     }
 
