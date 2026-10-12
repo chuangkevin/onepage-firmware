@@ -17,6 +17,7 @@
 #include "lwip/pbuf.h"
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
+#include "esp_heap_caps.h"
 #include <string.h>
 
 static const char *TAG = "ml_udp";
@@ -198,8 +199,9 @@ microlink_udp_socket_t *microlink_udp_create(microlink_t *ml, uint16_t local_por
 
     /* Start RX task (single-core C61: core 0) */
     sock->rx_running = true;
-    if (xTaskCreatePinnedToCore(udp_rx_task, "ml_udp_rx", 4096, sock,
-                                 configMAX_PRIORITIES - 2, &sock->rx_task, 0) != pdPASS) {
+    if (xTaskCreatePinnedToCoreWithCaps(udp_rx_task, "ml_udp_rx", 4096, sock,
+                                 configMAX_PRIORITIES - 2, &sock->rx_task, 0,
+                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         sock->rx_running = false;
         sock->rx_task = NULL;
     }
