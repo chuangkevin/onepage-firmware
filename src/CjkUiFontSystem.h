@@ -19,6 +19,8 @@
 #include <EpdFontData.h>
 #include <SdCardFont.h>
 
+class SdCardFontRegistry;
+
 class CjkUiFontSystem {
  public:
   CjkUiFontSystem() = default;
@@ -26,11 +28,14 @@ class CjkUiFontSystem {
   CjkUiFontSystem(const CjkUiFontSystem&) = delete;
   CjkUiFontSystem& operator=(const CjkUiFontSystem&) = delete;
 
-  // Load the CJK UI font from the SD card (first existing candidate path).
+  // Load the UI CJK font. When `family` is non-empty and present in `registry`,
+  // load that family's file closest to `sizeEnum` (0..3 -> 12/14/16/18 pt);
+  // otherwise fall back to the built-in default candidate paths.
   // Safe to call more than once (no-op once loaded). Returns true on success;
   // logs a warning and returns false if no font file is present — callers must
   // tolerate this (UI simply shows replacement boxes for CJK).
-  bool loadIfAvailable();
+  bool loadIfAvailable(const SdCardFontRegistry* registry = nullptr, const char* family = nullptr,
+                       uint8_t sizeEnum = 1);
 
   // Wire the CJK fallback into the UI EpdFont objects. Must be called after
   // loadIfAvailable() returned true. Copies each builtin EpdFontData into a

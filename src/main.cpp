@@ -317,7 +317,7 @@ void setupDisplayAndFonts(bool seamless = false) {
   // builtin UI fonts, so Chinese UI labels — and the "简体中文"/"繁體中文" entries
   // in the language picker — render even before Chinese is selected. Absent
   // font file degrades gracefully (CJK shows as replacement boxes).
-  if (cjkUiFontSystem.loadIfAvailable()) {
+  if (cjkUiFontSystem.loadIfAvailable(&sdFontSystem.registry(), SETTINGS.uiFontFamilyName, SETTINGS.uiFontSize)) {
     cjkUiFontSystem.attachToUiFonts(ui10RegularFont, ui10BoldFont, ui12RegularFont, ui12BoldFont, smallFont);
   }
 #endif

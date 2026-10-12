@@ -5,6 +5,7 @@
 #include <EpdFontFamily.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <SdCardFontRegistry.h>
 
 #include <cstring>
 
@@ -12,8 +13,52 @@ CjkUiFontSystem cjkUiFontSystem;
 
 constexpr const char* CjkUiFontSystem::kCandidatePaths[];
 
-bool CjkUiFontSystem::loadIfAvailable() {
+namespace {
+// UI size enum (0..3) -> target point size, aligned with the reader size scale.
+uint8_t uiSizeToPoint(uint8_t sizeEnum) {
+  switch (sizeEnum) {
+    case 0:
+      return 12;
+    case 2:
+      return 16;
+    case 3:
+      return 18;
+    case 1:
+    default:
+      return 14;
+  }
+}
+}  // namespace
+
+bool CjkUiFontSystem::loadIfAvailable(const SdCardFontRegistry* registry, const char* family, uint8_t sizeEnum) {
   if (loaded_) return true;
+
+  // Preferred: the family selected in Settings -> Display -> UI Font, at the
+  // closest of its installed sizes. This is what lets the user change the UI
+  // CJK font/size on-device without swapping the SD card.
+  if (registry != nullptr && family != nullptr && family[0] != '\0') {
+    const SdCardFontFamilyInfo* fam = registry->findFamily(family);
+    if (fam != nullptr && !fam->files.empty()) {
+      const uint8_t target = uiSizeToPoint(sizeEnum);
+      const SdCardFontFileInfo* best = nullptr;
+      uint8_t bestDelta = 255;
+      for (const auto& f : fam->files) {
+        const uint8_t d = f.pointSize > target ? f.pointSize - target : target - f.pointSize;
+        if (best == nullptr || d < bestDelta) {
+          best = &f;
+          bestDelta = d;
+        }
+      }
+      if (best != nullptr && font_.load(best->path.c_str())) {
+        loaded_ = true;
+        LOG_INF("CJKUI", "Loaded UI CJK font from setting: %s", best->path.c_str());
+        return true;
+      }
+      LOG_ERR("CJKUI", "UI font family '%s' found but failed to load", family);
+    } else {
+      LOG_DBG("CJKUI", "UI font family '%s' not on card; using default", family);
+    }
+  }
 
   for (const char* path : kCandidatePaths) {
     if (!Storage.exists(path)) continue;

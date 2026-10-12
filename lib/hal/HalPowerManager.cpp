@@ -33,34 +33,12 @@ void HalPowerManager::setPowerSaving(bool enabled) {
     return;  // invalid state
   }
 
-  auto wifiMode = WiFi.getMode();
-  if (wifiMode != WIFI_MODE_NULL) {
-    // Wifi is active, force disabling power saving
-    enabled = false;
-  }
-
-  // Note: We don't use mutex here to avoid too much overhead,
-  // it's not very important if we read a slightly stale value for currentLockMode
-  const LockMode mode = currentLockMode;
-
-  // Decide the target CPU frequency by priority:
-  //   Lock (perf-critical task) / WiFi  -> full speed (normalFreq)
-  //   BLE link up (no WiFi/lock)         -> BLE_ACTIVE_FREQ (80 MHz): low enough
-  //                                         to cut CPU power, high enough to keep
-  //                                         the BLE radio timing stable (10 MHz
-  //                                         trips the interrupt watchdog).
-  //   idle power-saving requested        -> LOW_POWER_FREQ (10 MHz)
-  //   otherwise                          -> full speed
-  int targetFreq;
-  if (mode != None || !enabled) {
-    // A lock is held, or the caller does not want power saving right now.
-    // BLE still gets its 80 MHz clamp (a link being up is not "full speed"
-    // work), but a NormalSpeed lock or WiFi overrides everything.
-    targetFreq = (bleActive_ && mode == None && wifiMode == WIFI_MODE_NULL) ? BLE_ACTIVE_FREQ : normalFreq;
-  } else {
-    // enabled && no lock: idle. Drop to 10 MHz, unless a BLE link forbids it.
-    targetFreq = bleActive_ ? BLE_ACTIVE_FREQ : LOW_POWER_FREQ;
-  }
+  // CPU frequency scaling DISABLED: always pin the clock to full speed
+  // (normalFreq). The previous idle drop to LOW_POWER_FREQ (10 MHz) and the
+  // BLE_ACTIVE_FREQ (80 MHz) clamp are both removed — the clock never changes
+  // now. Real power saving stays on auto-sleep (timeout) + deep sleep.
+  (void)enabled;
+  const int targetFreq = normalFreq;
 
   const int currentFreq = currentSetFreq > 0 ? currentSetFreq : normalFreq;
   if (targetFreq == currentFreq) {

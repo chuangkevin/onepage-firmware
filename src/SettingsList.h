@@ -90,6 +90,49 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   return s;
 }
 
+// Build the UI (menu/interface) CJK font-family setting. Mirrors the reader
+// font-family picker but writes SETTINGS.uiFontFamilyName (empty = built-in
+// default path). Lets the user change the UI font on-device without swapping
+// the SD card.
+inline SettingInfo buildUiFontFamilySetting(const SdCardFontRegistry* registry) {
+  std::vector<std::string> labels;
+  std::vector<std::string> familyNames;
+  labels.push_back(I18N.get(StrId::STR_UI_FONT_DEFAULT));
+  if (registry) {
+    for (const auto& f : registry->getFamilies()) {
+      labels.push_back(f.name);
+      familyNames.push_back(f.name);
+    }
+  }
+
+  SettingInfo s;
+  s.nameId = StrId::STR_UI_FONT;
+  s.type = SettingType::ENUM;
+  s.enumStringValues = std::move(labels);
+  s.key = "uiFontFamily";
+  s.category = StrId::STR_CAT_DISPLAY;
+
+  s.valueGetter = [familyNames]() -> uint8_t {
+    if (SETTINGS.uiFontFamilyName[0] != '\0') {
+      for (int i = 0; i < static_cast<int>(familyNames.size()); i++) {
+        if (familyNames[i] == SETTINGS.uiFontFamilyName) {
+          return static_cast<uint8_t>(i + 1);
+        }
+      }
+    }
+    return 0;
+  };
+  s.valueSetter = [familyNames](uint8_t v) {
+    if (v == 0 || v - 1 >= static_cast<int>(familyNames.size())) {
+      SETTINGS.uiFontFamilyName[0] = '\0';
+    } else {
+      strncpy(SETTINGS.uiFontFamilyName, familyNames[v - 1].c_str(), sizeof(SETTINGS.uiFontFamilyName) - 1);
+      SETTINGS.uiFontFamilyName[sizeof(SETTINGS.uiFontFamilyName) - 1] = '\0';
+    }
+  };
+  return s;
+}
+
 // Shared settings list used by both the device settings UI and the web settings API.
 // Each entry has a key (for JSON API) and category (for grouping).
 // ACTION-type entries and entries without a key are device-only.
@@ -128,6 +171,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           "uiTheme", StrId::STR_CAT_DISPLAY),
         SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
                             StrId::STR_CAT_DISPLAY),
+        // UI (menu/interface) CJK font size. The UI font FAMILY entry is inserted
+        // dynamically in getSettingsList() when SD fonts are present (see
+        // buildUiFontFamilySetting). Both apply on next boot.
+        SettingInfo::Enum(StrId::STR_UI_FONT_SIZE, &CrossPointSettings::uiFontSize,
+                          {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE}, "uiFontSize",
+                          StrId::STR_CAT_DISPLAY),
 
         // --- Reader ---
         // Built-in font-family entry. Replaced per-call with a registry-aware
@@ -292,6 +341,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     auto it = std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_FONT_FAMILY; });
     if (it != v.end()) {
       *it = buildFontFamilySetting(registry);
+    }
+    // Insert the UI font-family picker right before the UI font-size entry.
+    auto itu = std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_UI_FONT_SIZE; });
+    if (itu != v.end()) {
+      v.insert(itu, buildUiFontFamilySetting(registry));
     }
   }
   return v;

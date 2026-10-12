@@ -211,8 +211,10 @@ class CrossPointSettings {
   uint8_t ruledLineThickness = 0;  // enum index 0/1/2 -> 1/2/3 px
   uint8_t ruledLineDash = 1;       // enum index 0/1/2 -> sparse(8+8)/normal(4+4)/dense(2+2)
   uint8_t ruledLineOffset = 12;    // Y offset, bias 8: value 0..20 -> -8..+12px (12 = +4, matches prior default)
-  // Short power button click behaviour
-  uint8_t shortPwrBtn = IGNORE;
+  // Short power button click behaviour. Default SLEEP so a single light tap
+  // sleeps / wakes the device (phone-like); getPowerButtonDuration() drops the
+  // wake hold threshold to 10 ms in this mode.
+  uint8_t shortPwrBtn = SLEEP;
   // EPUB reading orientation settings
   // 0 = portrait (default), 1 = landscape clockwise, 2 = inverted, 3 = landscape counter-clockwise
   uint8_t orientation = PORTRAIT;
@@ -262,6 +264,12 @@ class CrossPointSettings {
   uint8_t focusReadingEnabled = 0;
   // SD card font family name (empty = use built-in fontFamily)
   char sdFontFamilyName[32] = "";
+  // UI (menu/interface) CJK font: SD-card family name (empty = built-in default path).
+  // Loaded by CjkUiFontSystem at boot; lets the user change the UI font on-device
+  // without swapping the SD card.
+  char uiFontFamilyName[32] = "";
+  // UI CJK font size: 0=Small 1=Medium 2=Large 3=XLarge -> 12/14/16/18 pt
+  uint8_t uiFontSize = 1;
   // Show hidden files/directories (starting with '.') in the file browser (0 = hidden, 1 = show)
   uint8_t showHiddenFiles = 0;
   // Remove a book from the Recent Books list when its End-of-Book screen is reached (0 = off, 1 = on)

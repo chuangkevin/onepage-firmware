@@ -148,6 +148,10 @@ bool JsonSettingsIO::saveSettings(const CrossPointSettings& s, const char* path)
   if (s.sdFontFamilyName[0] != '\0') {
     doc["sdFontFamilyName"] = s.sdFontFamilyName;
   }
+  // UI CJK font family — dynamic SettingsList entry, save manually too
+  if (s.uiFontFamilyName[0] != '\0') {
+    doc["uiFontFamilyName"] = s.uiFontFamilyName;
+  }
 
   // Language -- managed by LanguageSelectActivity, not in SettingsList.
   // Stored as ISO code string ("EN", "DE", ...) for stability across enum reorders.
@@ -273,6 +277,10 @@ bool JsonSettingsIO::loadSettings(CrossPointSettings& s, const char* json, bool*
   const char* sfn = doc["sdFontFamilyName"] | "";
   strncpy(s.sdFontFamilyName, sfn, sizeof(s.sdFontFamilyName) - 1);
   s.sdFontFamilyName[sizeof(s.sdFontFamilyName) - 1] = '\0';
+  // UI CJK font family — dynamic SettingsList entry, persist manually too
+  const char* uiff = doc["uiFontFamilyName"] | "";
+  strncpy(s.uiFontFamilyName, uiff, sizeof(s.uiFontFamilyName) - 1);
+  s.uiFontFamilyName[sizeof(s.uiFontFamilyName) - 1] = '\0';
   if (storedFontFamily == CrossPointSettings::LEGACY_OPENDYSLEXIC && s.sdFontFamilyName[0] == '\0') {
     s.fontFamily = CrossPointSettings::NOTOSERIF;
     strncpy(s.sdFontFamilyName, "OpenDyslexic", sizeof(s.sdFontFamilyName) - 1);
