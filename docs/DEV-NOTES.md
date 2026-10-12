@@ -78,8 +78,8 @@ cp -f .pio/build/onepage/{bootloader,partitions,firmware}.bin release/
 - Web 頁：**`/badge`**（`src/network/html/BadgePage.html`），瀏覽器端合成 → 產 **480×800 1-bit BMP** →
   POST 到現成的 **`/upload?path=/.crosspoint`**。導覽列已加「名牌」。
 - 版面：**SARA logo（上）→ 照片（中）→ 名字／職稱（下）**；照片用 **Floyd–Steinberg 網點**。logo 以 base64 內嵌。
-- 刷新順序：**先 `clearScreen()` + `FULL_REFRESH` 清殘影 → 再 `renderBitmapSleepScreen`（HALF）畫圖**。
-  （反過來「畫完再 full」會把黑色洗成灰。）
+- 刷新：名牌用 `renderBitmapSleepScreen(bitmap)` 後**再做一次 `displayBuffer(HalDisplay::FULL_REFRESH)`**（v2）。
+  實測這版（render + full）對比/殘影最可接受；「先 clear+FULL 再 half」與「只 half」都更糟。
 
 ## TODO
 
