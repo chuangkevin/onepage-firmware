@@ -1,5 +1,6 @@
 #include "SDCardManager.h"
 
+#include <Preferences.h>
 #include <esp_partition.h>
 
 namespace {
@@ -14,6 +15,27 @@ constexpr uint32_t SPI_FQ = 20000000;
 constexpr uint8_t SD_CS = 12;
 constexpr uint32_t SPI_FQ = 40000000;
 #endif
+
+// NVS flag: internal storage holds user data that has not been copied to a
+// microSD yet. Set on every write while running on internal storage; cleared
+// once the migration to SD has been verified.
+constexpr const char* kNvsNamespace = "onepage";
+constexpr const char* kNvsDirtyKey = "int_dirty";
+
+bool nvsGetDirty() {
+  Preferences prefs;
+  if (!prefs.begin(kNvsNamespace, true)) return false;
+  const bool dirty = prefs.getBool(kNvsDirtyKey, false);
+  prefs.end();
+  return dirty;
+}
+
+void nvsSetDirty(bool value) {
+  Preferences prefs;
+  if (!prefs.begin(kNvsNamespace, false)) return;
+  prefs.putBool(kNvsDirtyKey, value);
+  prefs.end();
+}
 }  // namespace
 
 SDCardManager SDCardManager::instance;
@@ -49,6 +71,9 @@ bool SDCardManager::begin() {
   if (sdOk) {
     usingInternal = false;
     initialized = true;
+    // Was anything written while running on internal storage? If so, copy it
+    // out to the card now (copy-only, verified).
+    migrateInternalToSd();
     return true;
   }
 
@@ -92,7 +117,13 @@ bool SDCardManager::beginInternal() {
   }
 
   // Try existing FAT first (fast path on every boot after the first).
+  // Two layouts are accepted: an MBR-partitioned volume (what SdFat's own
+  // FatFormatter writes) and a partitionless "superfloppy" volume (what
+  // mtools/mformat produces, used to preload fonts from the flasher).
   if (internalVol.begin(&internalDev)) {
+    return true;
+  }
+  if (internalVol.begin(&internalDev, true, 0, 0)) {
     return true;
   }
 
@@ -135,6 +166,82 @@ void SDCardManager::runBootSelfTest() {
   if (wrote && match) {
     // Persist the marker so the test runs once per format.
     writeFile(kMarker, "ok");
+  }
+}
+
+namespace {
+// Copy one file between two mounted FAT volumes; verify the copy by size.
+bool copyOneFileVerified(FsVolume& src, FsVolume& dst, const char* path) {
+  FsFile in = src.open(path, O_RDONLY);
+  if (!in) return false;
+  const uint32_t want = in.fileSize();
+  if (dst.exists(path)) dst.remove(path);
+  FsFile out = dst.open(path, O_RDWR | O_CREAT | O_TRUNC);
+  if (!out) {
+    in.close();
+    return false;
+  }
+  uint8_t buf[512];
+  bool ok = true;
+  int n;
+  while ((n = in.read(buf, sizeof(buf))) > 0) {
+    if (out.write(buf, static_cast<size_t>(n)) != static_cast<size_t>(n)) {
+      ok = false;
+      break;
+    }
+  }
+  out.close();
+  in.close();
+  if (!ok) return false;
+  FsFile chk = dst.open(path, O_RDONLY);
+  const bool sizeOk = chk && chk.fileSize() == want;
+  if (chk) chk.close();
+  return sizeOk;
+}
+
+// Recursively mirror `path` from src to dst. Copy-only: nothing on dst is
+// removed except a same-named file being overwritten.
+void copyTreeFiles(FsVolume& src, FsVolume& dst, const char* path, unsigned& copied, unsigned& failed) {
+  FsFile dir = src.open(path);
+  if (!dir || !dir.isDirectory()) return;
+  char name[128];
+  for (FsFile f = dir.openNextFile(); f; f = dir.openNextFile()) {
+    f.getName(name, sizeof(name));
+    String p = String(path);
+    if (!p.endsWith("/")) p += "/";
+    p += name;
+    const bool isDir = f.isDirectory();
+    f.close();
+    if (isDir) {
+      dst.mkdir(p.c_str(), true);
+      copyTreeFiles(src, dst, p.c_str(), copied, failed);
+    } else if (copyOneFileVerified(src, dst, p.c_str())) {
+      copied++;
+    } else {
+      failed++;
+    }
+  }
+  dir.close();
+}
+}  // namespace
+
+void SDCardManager::migrateInternalToSd() {
+  if (!nvsGetDirty()) {
+    return;
+  }
+  // Mount the internal volume WITHOUT stealing the current working volume.
+  if (!internalVol.begin(&internalDev, false) && !internalVol.begin(&internalDev, false, 0, 0)) {
+    if (Serial) Serial.println("[SD] migrate: internal volume not mountable");
+    return;
+  }
+  unsigned copied = 0, failed = 0;
+  copyTreeFiles(internalVol, sd, "/", copied, failed);
+  internalVol.end();
+  sd.chvol();  // restore the microSD as the current working volume
+  if (Serial) Serial.printf("[SD] migrate internal->SD: %u copied, %u failed\n", copied, failed);
+  if (failed == 0) {
+    nvsSetDirty(false);
+    if (Serial) Serial.println("[SD] migration verified; internal dirty flag cleared");
   }
 }
 
@@ -267,6 +374,7 @@ bool SDCardManager::writeFile(const char* path, const String& content) {
     if (Serial) Serial.println("SDCardManager: not initialized; cannot write file");
     return false;
   }
+  if (usingInternal) nvsSetDirty(true);
 
   // Remove existing file so we perform an overwrite rather than append
   if (vol().exists(path)) {
@@ -334,6 +442,7 @@ bool SDCardManager::openFileForRead(const char* moduleName, const String& path, 
 }
 
 bool SDCardManager::openFileForWrite(const char* moduleName, const char* path, FsFile& file) {
+  if (usingInternal) nvsSetDirty(true);
   file = vol().open(path, O_RDWR | O_CREAT | O_TRUNC);
   if (!file) {
     if (Serial) Serial.printf("[%lu] [%s] Failed to open file for writing: %s\n", millis(), moduleName, path);

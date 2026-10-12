@@ -48,6 +48,11 @@ class SDCardManager {
   // it back and compare, then list the root. Records a marker so it runs once.
   void runBootSelfTest();
 
+  // When a microSD is present and internal storage holds data not yet copied
+  // out, mirror the internal tree onto the SD (copy-only, size-verified), then
+  // clear the dirty flag. Never deletes anything on either side.
+  void migrateInternalToSd();
+
   static SDCardManager& getInstance() { return instance; }
 
  private:
