@@ -1,13 +1,14 @@
 {
   "name": "wireguard_lwip",
   "version": "1.0.0",
-  "description": "wireguard-lwip for ESP32. PlatformIO wrapper: sources live in components/microlink/components/wireguard_lwip (unmodified). Only the portable C crypto backend (crypto/refc) is built; the Cortex-M0 assembly backend under crypto/cortex is excluded.",
+  "description": "wireguard-lwip for ESP32. PlatformIO wrapper: sources live in components/microlink/components/wireguard_lwip (unmodified). Only the portable C crypto backend (crypto/refc) is built; the Cortex-M0 assembly backend under crypto/cortex is excluded. crypto/refc/x25519.c is also excluded because microlink bundles a byte-identical copy and PlatformIO links object files directly (not via archives), so both copies would collide; microlink's copy provides the x25519/X25519_BASE_POINT symbols.",
   "build": {
     "srcDir": "../../components/microlink/components/wireguard_lwip/src",
-    "includeDir": "../../components/microlink/components/wireguard_lwip/src",
+    "includeDir": "../../components/microlink/components/wireguard_lwip/src/crypto/refc",
     "srcFilter": [
       "+<*>",
-      "-<crypto/cortex/>"
+      "-<crypto/cortex/>",
+      "-<crypto/refc/x25519.c>"
     ]
   },
   "platforms": "espressif32",

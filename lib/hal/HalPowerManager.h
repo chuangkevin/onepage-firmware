@@ -32,7 +32,12 @@ class HalPowerManager {
  public:
   static constexpr int LOW_POWER_FREQ = 10;                    // MHz
   static constexpr int BLE_ACTIVE_FREQ = 80;                   // MHz (see setBleActive)
-  static constexpr unsigned long IDLE_POWER_SAVING_MS = 2000;  // ms
+  // Idle CPU-frequency drop DISABLED on purpose (was 2000 ms). At 10 MHz the
+  // USB-Serial/JTAG CDC link becomes unreliable — macOS drops /dev/cu.usbmodem*
+  // — and the UI's redraw/input latency balloons, which reads exactly like "the
+  // device hung". Keep full speed; real power saving is still handled by the
+  // auto-sleep timeout and deep sleep.
+  static constexpr unsigned long IDLE_POWER_SAVING_MS = 0xFFFFFFFFUL;
   static constexpr unsigned long BATTERY_POLL_MS = 1500;       // ms
 
   void begin();
