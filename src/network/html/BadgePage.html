@@ -72,29 +72,7 @@ function render(){
   ctx.fillStyle='#333';
   drawFit(title||' ', W/2, 710, W-80, 34, '500');
 
-  binarize({x:px,y:py,w:pw,h:ph});
-}
-
-// Floyd–Steinberg ONLY inside the photo rect; everything else (logo, name,
-// title, background) is thresholded to solid black/white so thin glyph strokes
-// stay crisp and dark instead of being broken up by the dither.
-function binarize(rect){
-  const img=ctx.getImageData(0,0,W,H), d=img.data;
-  const R=rect||{x:0,y:0,w:0,h:0};
-  const g=new Float32Array(Math.max(1,R.w*R.h));
-  for(let y=0;y<R.h;y++)for(let x=0;x<R.w;x++){const i=((R.y+y)*W+(R.x+x))*4; g[y*R.w+x]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];}
-  for(let y=0;y<R.h;y++)for(let x=0;x<R.w;x++){
-    const i=y*R.w+x, old=g[i], nv=old<128?0:255, err=old-nv; g[i]=nv;
-    const put=(xx,yy,add)=>{ if(xx>=0&&xx<R.w&&yy>=0&&yy<R.h) g[yy*R.w+xx]+=add; };
-    put(x+1,y,err*7/16); put(x-1,y+1,err*3/16); put(x,y+1,err*5/16); put(x+1,y+1,err*1/16);
-  }
-  for(let y=0;y<R.h;y++)for(let x=0;x<R.w;x++){const i=((R.y+y)*W+(R.x+x))*4; const v=g[y*R.w+x]<128?0:255; d[i]=d[i+1]=d[i+2]=v;}
-  // Outside the photo: hard threshold (solid black text/logo).
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-    if(x>=R.x&&x<R.x+R.w&&y>=R.y&&y<R.y+R.h) continue;
-    const i=(y*W+x)*4; const lum=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const v=lum<180?0:255; d[i]=d[i+1]=d[i+2]=v;
-  }
-  ctx.putImageData(img,0,0);
+  binarize();
 }
 
 function drawCover(img,x,y,w,h,r){
@@ -108,7 +86,22 @@ function drawFit(text,x,y,maxW,maxH,weight){
   ctx.fillText(text,x,y);
 }
 
-// (binarize(rect) is defined above; only the photo region is dithered.)
+// Grayscale + Floyd–Steinberg to 1-bit, in place.
+function binarize(){
+  const img=ctx.getImageData(0,0,W,H), d=img.data;
+  const g=new Float32Array(W*H);
+  for(let i=0,p=0;i<d.length;i+=4,p++) g[p]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const i=y*W+x; const old=g[i]; const nv=old<128?0:255; const err=old-nv;
+      g[i]=nv;
+      if(x+1<W) g[i+1]+=err*7/16;
+      if(y+1<H){ if(x>0)g[i+W-1]+=err*3/16; g[i+W]+=err*5/16; if(x+1<W)g[i+W+1]+=err*1/16; }
+    }
+  }
+  for(let p=0;p<W*H;p++){ const i=p*4; const v=g[p]<128?0:255; d[i]=d[i+1]=d[i+2]=v; }
+  ctx.putImageData(img,0,0);
+}
 
 function makeBmp(){
   const rowBytes=60; // 480 px / 8 = 60, already 4-byte aligned

@@ -159,8 +159,10 @@ void SleepActivity::renderNameplateSleepScreen() const {
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       const auto prev = renderer.getOrientation();
       renderer.setOrientation(static_cast<GfxRenderer::Orientation>(SETTINGS.nameplateOrientation));
-      // Match the built-in Custom sleep screen exactly: one HALF refresh.
       renderBitmapSleepScreen(bitmap);
+      // Full refresh to clear ghosting from whatever was on screen before
+      // (the badge is a static image, so the extra refresh time is fine).
+      renderer.displayBuffer(HalDisplay::FULL_REFRESH);
       renderer.setOrientation(prev);
       file.close();
       return;
