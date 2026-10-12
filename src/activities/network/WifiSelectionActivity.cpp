@@ -100,6 +100,8 @@ void WifiSelectionActivity::startWifiScan() {
 
   // Start async scan
   WiFi.scanNetworks(true);  // true = async scan
+  LOG_DBG("WIFI", "Async scan requested (mode=%d status=%d heap=%d)", static_cast<int>(WiFi.getMode()),
+          static_cast<int>(WiFi.status()), ESP.getFreeHeap());
 }
 
 void WifiSelectionActivity::processWifiScanResults() {
@@ -110,7 +112,10 @@ void WifiSelectionActivity::processWifiScanResults() {
     return;
   }
 
+  LOG_DBG("WIFI", "Scan finished rc=%d heap=%d", static_cast<int>(scanResult), ESP.getFreeHeap());
+
   if (scanResult == WIFI_SCAN_FAILED) {
+    LOG_ERR("WIFI", "WiFi scan FAILED");
     state = WifiSelectionState::NETWORK_LIST;
     requestUpdate();
     return;

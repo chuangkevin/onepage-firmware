@@ -151,9 +151,12 @@ class EInkDisplay {
   uint8_t _x3InitialFullSyncsRemaining = 0;
   bool _x3ForceFullSyncNext = false;
   uint8_t _x3ForcedConditionPassesNext = 0;
-  // Frame buffer (statically allocated)
-  uint8_t frameBuffer0[MAX_BUFFER_SIZE];
-  uint8_t* frameBuffer;
+  // Frame buffer — allocated from PSRAM at begin() (falling back to internal
+  // DRAM). Keeping it out of .bss frees ~51 KB of internal SRAM, which the
+  // Wi-Fi driver needs for its RX buffer pool; with a static array Wi-Fi init
+  // fails with "Expected to init 4 rx buffer, actual is 0".
+  uint8_t* frameBuffer0 = nullptr;
+  uint8_t* frameBuffer = nullptr;
 #ifndef EINK_DISPLAY_SINGLE_BUFFER_MODE
   uint8_t frameBuffer1[MAX_BUFFER_SIZE];
   uint8_t* frameBufferActive;

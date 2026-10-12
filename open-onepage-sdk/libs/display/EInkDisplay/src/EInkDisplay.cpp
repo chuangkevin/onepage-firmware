@@ -1,6 +1,7 @@
 #include "EInkDisplay.h"
 
 #include <cstring>
+#include <esp_heap_caps.h>
 #include <fstream>
 #include <vector>
 
@@ -490,6 +491,25 @@ EInkDisplay::EInkDisplay(int8_t sclk, int8_t mosi, int8_t cs, int8_t dc,
 void EInkDisplay::begin() {
   if (Serial)
     Serial.printf("[%lu] EInkDisplay: begin() called\n", millis());
+
+  // Allocate the framebuffer from PSRAM (fall back to internal DRAM). Done at
+  // runtime rather than as a .bss array so internal SRAM stays free for the
+  // Wi-Fi driver's RX buffer pool.
+  if (frameBuffer0 == nullptr) {
+    frameBuffer0 = static_cast<uint8_t*>(heap_caps_malloc(MAX_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    const bool inPsram = (frameBuffer0 != nullptr);
+    if (frameBuffer0 == nullptr) {
+      frameBuffer0 = static_cast<uint8_t*>(heap_caps_malloc(MAX_BUFFER_SIZE, MALLOC_CAP_8BIT));
+    }
+    if (Serial)
+      Serial.printf("[%lu]   Frame buffer in %s (%lu bytes)\n", millis(),
+                    inPsram ? "PSRAM" : (frameBuffer0 != nullptr ? "internal RAM" : "ALLOC FAILED"),
+                    static_cast<unsigned long>(MAX_BUFFER_SIZE));
+  }
+  if (frameBuffer0 == nullptr) {
+    if (Serial) Serial.printf("[%lu]   FATAL: frame buffer allocation failed\n", millis());
+    return;
+  }
 
   isScreenOn = false;
   customLutActive = false;
