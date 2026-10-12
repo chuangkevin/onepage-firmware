@@ -1,5 +1,16 @@
 # OnePage Reader — Firmware
 
+> ## 🔧 本機 fork 改動（先看這裡）
+> 這是 `chuangkevin` 的 fork，加了：**無 microSD 的內建儲存**、**中文字型 + 預設繁體中文**、
+> **Wi-Fi 記憶體修正**、**hang 修正（不再閒置降頻到 10MHz）**、**Readflix 書庫**、**Tailscale + 手機掃碼登入**。
+>
+> - 目前狀態與待辦：**[`docs/STATUS.md`](docs/STATUS.md)**
+> - 待辦清單（GitHub Issues）：https://github.com/chuangkevin/onepage-firmware/issues
+> - 實機韌體備份：`chuangkevin/onepage-original-firmware`
+>
+> 建置：`pio run -e onepage`（需 pioarduino espressif32，見 `platformio.ini`）
+> 刷機：`./scripts/flash-device.sh /dev/cu.usbmodemXXXX`（會先備份 16MB flash 與 app1）
+
 > **Based on [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** (MIT © Dave Allie).
 > This is an **independent port** of CrossPoint to the self-designed **OnePage** e-reader (**ESP32-C61**).
 > Upstream targets the ESP32-C3 Xteink X4/X3; this repo adapts the firmware to the OnePage C61 hardware.
