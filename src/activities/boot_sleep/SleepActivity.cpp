@@ -159,10 +159,12 @@ void SleepActivity::renderNameplateSleepScreen() const {
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       const auto prev = renderer.getOrientation();
       renderer.setOrientation(static_cast<GfxRenderer::Orientation>(SETTINGS.nameplateOrientation));
-      renderBitmapSleepScreen(bitmap);
-      // Full refresh to clear ghosting from whatever was on screen before
-      // (the badge is a static image, so the extra refresh time is fine).
+      // Clear to white with a strong FULL refresh first (kills ghosting), then
+      // draw the badge with the normal HALF refresh so black stays solid. Doing
+      // FULL *after* the image washed it out to grey.
+      renderer.clearScreen();
       renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+      renderBitmapSleepScreen(bitmap);
       renderer.setOrientation(prev);
       file.close();
       return;
