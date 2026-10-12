@@ -4,13 +4,11 @@
 #   ./flash-device.sh /dev/cu.usbmodemXXXX [backup-dir]
 #
 # Steps:
-#   1. Back up the device's full 16 MB flash (restorable with esptool write-flash 0x0).
-#   2. Flash bootloader + partition table + app + the internal-storage image
-#      (which carries the CJK font used when no microSD is inserted).
-#
-# The internal-storage image goes to the app1 slot (0x650000) and is mounted as
-# a FAT volume by the firmware when no microSD is present. Nothing here touches
-# the microSD, so a card in the slot is left alone.
+#   1. Back up the device's full 16 MB flash.
+#   2. Back up the internal-storage partition (app1) as it stands on the device,
+#      so device-side data (Wi-Fi credentials, books, reading state) is never
+#      lost when step 3 overwrites it.
+#   3. Flash bootloader + partition table + app + the internal-storage image.
 set -euo pipefail
 
 PORT="${1:?usage: flash-device.sh <serial-port> [backup-dir]}"
@@ -25,11 +23,20 @@ done
 mkdir -p "$BACKUP_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
-echo "== 1/2  backing up full 16MB flash -> $BACKUP_DIR/flash-$STAMP.bin"
-uvx esptool --port "$PORT" read-flash 0 0x1000000 "$BACKUP_DIR/flash-$STAMP.bin"
-shasum -a 256 "$BACKUP_DIR/flash-$STAMP.bin"
+MAC="$(uvx esptool --port "$PORT" chip-id 2>&1 | awk '/^MAC:/{print $2}' | tail -1)"
+SLUG="$(echo "$MAC" | tr ':' '-')"
+DST="$BACKUP_DIR/${SLUG:-unknown}"
+mkdir -p "$DST"
 
-echo "== 2/2  flashing firmware + internal storage"
+echo "== 1/3  backing up full 16MB flash -> $DST/flash-$STAMP.bin"
+uvx esptool --port "$PORT" read-flash 0 0x1000000 "$DST/flash-$STAMP.bin"
+shasum -a 256 "$DST/flash-$STAMP.bin"
+
+echo "== 2/3  backing up internal storage (app1) -> $DST/app1-$STAMP.bin"
+uvx esptool --port "$PORT" read-flash 0x650000 0x640000 "$DST/app1-$STAMP.bin" >/dev/null
+shasum -a 256 "$DST/app1-$STAMP.bin"
+
+echo "== 3/3  flashing firmware + internal storage"
 uvx esptool --port "$PORT" write-flash \
   0x0      "$REL/bootloader.bin" \
   0x8000   "$REL/partitions.bin" \
@@ -37,3 +44,4 @@ uvx esptool --port "$PORT" write-flash \
   0x650000 "$REL/internal-storage.img"
 
 echo "done — device should boot to Home with no microSD."
+echo "device-side data saved to: $DST/app1-$STAMP.bin"
