@@ -2,3 +2,4 @@
 .cache/
 *.log
 sdkconfig.onepage.local
+backups/**/*.bin
