@@ -83,8 +83,4 @@ cp -f .pio/build/onepage/{bootloader,partitions,firmware}.bin release/
 
 ## TODO
 
-- [ ] **名牌最下面顯示載具條碼**：使用者自己輸入載具號（例：`/SM6OLEQ`），在名牌底部畫成**條碼**顯示到螢幕。
-  - 前端 `BadgePage.html` 加一個輸入框；用 JS 產生條碼條紋畫進 canvas（例：Code 128 / Code 39）。
-  - 注意 reader 端目前只有 QR（`src/util/QrUtils.*`），**沒有條碼繪製公用**；若要在韌體端畫需自寫，或沿用
-    「網頁端畫好、存成 BMP」這條路（較簡單，與現有名牌流程一致）。
-  - （「今天先不要做」— 只記 TODO。）
+- [x] **名牌載具條碼**：`BadgePage.html` 可輸入 `/` 開頭的 7 碼載具號；用 Code 39 產生黑白條碼、在條碼下列印原號，再和名牌一起存成 BMP。留空不顯示；格式錯誤會在欄位下提示。

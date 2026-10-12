@@ -22,11 +22,13 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
 </style>
 <div class="wrap">
   <div class="card"><h3>名牌製作（直向 480×800）</h3>
-    <p class="small">上傳照片、填姓名／職稱；版面：公司 logo → 照片 → 名字。存到裝置後設成待機「名牌」。</p></div>
+    <p class="small">上傳照片、填姓名／職稱與載具號碼；版面：公司 logo → 照片 → 名字 → 條碼。存到裝置後設成待機「名牌」。</p></div>
   <div class="card">
     <label>照片 <input type="file" id="photo" accept="image/*"></label>
     <label>姓名 <input type="text" id="name" maxlength="12" placeholder="你的名字"></label>
     <label>職稱 <input type="text" id="title" maxlength="20" placeholder="職稱"></label>
+    <label>載具號碼（選填，/＋7 碼英數） <input type="text" id="carrier" maxlength="8" placeholder="/SM6OLEQ" autocapitalize="characters" spellcheck="false"></label>
+    <p id="carrierStatus" class="small">填入 / 開頭的 8 碼手機條碼；留空則不顯示條碼。</p>
   </div>
   <div class="card">
     <div class="preview"><canvas id="cv" width="480" height="800"></canvas></div>
@@ -45,6 +47,18 @@ const logoImg=document.getElementById('logoImg');
 document.getElementById('photo').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{photoImg=im;render();};im.src=URL.createObjectURL(f);};
 document.getElementById('render').onclick=render;
 document.getElementById('save').onclick=save;
+document.getElementById('name').oninput=render;
+document.getElementById('title').oninput=render;
+document.getElementById('carrier').oninput=render;
+
+// Code 39 narrow/wide encodings. Mobile barcodes use '/' followed by seven
+// uppercase alphanumeric characters; the numeric patterns are the standard
+// 15-module Code 39 symbol encodings (one bits are black modules).
+const CODE39_CHARS='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%*';
+const CODE39_PATTERNS=[20957,29783,23639,30485,20951,29813,23669,20855,29789,23645,
+  29975,23831,30533,22295,30149,24005,21623,29981,23837,22301,30023,23879,30545,
+  22343,30161,24017,21959,30065,23921,22385,29015,18263,29141,17879,29045,18293,
+  17783,29021,18269,17477,17489,17681,20753,35770];
 
 function render(){
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
@@ -64,15 +78,57 @@ function render(){
     ctx.fillStyle='#bbb'; ctx.font='500 22px sans-serif'; ctx.textAlign='center'; ctx.fillText('尚未上傳照片',W/2,py+ph/2);
   }
 
-  // --- name / title (bottom) ---
+  // --- name / title ---
   const name=(document.getElementById('name').value||'').trim();
   const title=(document.getElementById('title').value||'').trim();
+  const carrier=(document.getElementById('carrier').value||'').trim().toUpperCase();
   ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-  drawFit(name||' ', W/2, 650, W-60, 72, '700');
+  drawFit(name||' ', W/2, 610, W-60, 62, '700');
   ctx.fillStyle='#333';
-  drawFit(title||' ', W/2, 710, W-80, 34, '500');
+  drawFit(title||' ', W/2, 655, W-80, 32, '500');
 
   binarize();
+
+  // Draw the barcode AFTER photo dithering so every bar remains solid black
+  // and the white quiet zones stay clean for phone scanners.
+  const status=document.getElementById('carrierStatus');
+  if(!carrier){
+    status.textContent='填入 / 開頭的 8 碼手機條碼；留空則不顯示條碼。';
+  }else if(!/^\/[A-Z0-9]{7}$/.test(carrier)){
+    status.textContent='格式不符：請輸入 / 加 7 碼英數字，例如 /SM6OLEQ。';
+  }else{
+    status.textContent='條碼預覽：'+carrier;
+    drawCode39(carrier,30,690,W-60,54);
+    ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.font='20px monospace'; ctx.fillText(carrier,W/2,782);
+  }
+}
+
+function drawCode39(value,x,y,maxWidth,height){
+  const symbols='*'+value+'*';
+  const patterns=[];
+  for(const ch of symbols){
+    const index=CODE39_CHARS.indexOf(ch);
+    if(index<0) throw new Error('Unsupported Code 39 character: '+ch);
+    // Match JsBarcode's standard Code 39 encoding: the integer's binary string
+    // is the exact run-length module sequence (the '*' start/stop is 16 bits).
+    patterns.push(CODE39_PATTERNS[index].toString(2));
+  }
+  const patternModules=patterns.reduce((sum,pattern)=>sum+pattern.length,0);
+  const totalModules=patternModules+(patterns.length-1)+20; // 10-module quiet zones
+  const module=Math.min(3,Math.floor(maxWidth/totalModules));
+  if(module<1) throw new Error('Carrier barcode does not fit');
+  const totalWidth=totalModules*module;
+  let cursor=x+Math.floor((maxWidth-totalWidth)/2)+10*module;
+  ctx.fillStyle='#000';
+  for(let c=0;c<patterns.length;c++){
+    const pattern=patterns[c];
+    for(let i=0;i<pattern.length;i++){
+      if(pattern[i]==='1') ctx.fillRect(cursor,y,module,height);
+      cursor+=module;
+    }
+    if(c<patterns.length-1) cursor+=module; // inter-character gap
+  }
 }
 
 function drawCover(img,x,y,w,h,r){
