@@ -395,9 +395,11 @@ skip_bsd_socket:
         return ESP_FAIL;
     }
 
-    ret = xTaskCreatePinnedToCoreWithCaps(ml_wg_mgr_task, "ml_wg_mgr", ML_TASK_WG_MGR_STACK,
-                                   ml, ML_TASK_WG_MGR_PRIO, &ml->wg_mgr_task, ML_TASK_WG_MGR_CORE,
-                                   MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    // wg_mgr persists peers to NVS (ml_peer_nvs_save) -> MUST use an INTERNAL-RAM
+    // stack: while flash is written the cache is disabled and a task whose stack
+    // lives in PSRAM cannot be scheduled (CPU_LOCKUP).
+    ret = xTaskCreatePinnedToCore(ml_wg_mgr_task, "ml_wg_mgr", ML_TASK_WG_MGR_STACK,
+                                   ml, ML_TASK_WG_MGR_PRIO, &ml->wg_mgr_task, ML_TASK_WG_MGR_CORE);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create wg_mgr task");
         return ESP_FAIL;

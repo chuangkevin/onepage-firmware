@@ -103,10 +103,11 @@ void TailscaleManager::ensureUp() {
   starting_ = true;
   // 8 KB stack: microlink_init() does NVS + several heap allocations and
   // microlink_start() spawns its own long-lived tasks, but neither blocks here.
-  // ESP32-C61 is single-core: pin to core 0. Stack is allocated from PSRAM so
-  // the bring-up does not compete with Wi-Fi for the small internal SRAM.
-  const BaseType_t ok = xTaskCreatePinnedToCoreWithCaps(taskEntry, "ts_bringup", 8 * 1024, this, 4, nullptr, 0,
-                                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  // ESP32-C61 is single-core: pin to core 0. This bring-up task runs
+  // microlink_init(), which writes NVS (flash). While flash is being written the
+  // cache is disabled, so a task whose stack lives in PSRAM cannot be scheduled
+  // (CPU_LOCKUP) — so this task MUST use an INTERNAL-RAM stack.
+  const BaseType_t ok = xTaskCreatePinnedToCore(taskEntry, "ts_bringup", 8 * 1024, this, 4, nullptr, 0);
   if (ok != pdPASS) {
     LOG_ERR("TS", "failed to create tailnet bring-up task");
     starting_ = false;
