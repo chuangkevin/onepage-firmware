@@ -1,0 +1,15 @@
+{
+  "name": "wireguard_lwip",
+  "version": "1.0.0",
+  "description": "wireguard-lwip for ESP32. PlatformIO wrapper: sources live in components/microlink/components/wireguard_lwip (unmodified). Only the portable C crypto backend (crypto/refc) is built; the Cortex-M0 assembly backend under crypto/cortex is excluded.",
+  "build": {
+    "srcDir": "../../components/microlink/components/wireguard_lwip/src",
+    "includeDir": "../../components/microlink/components/wireguard_lwip/src",
+    "srcFilter": [
+      "+<*>",
+      "-<crypto/cortex/>"
+    ]
+  },
+  "platforms": "espressif32",
+  "frameworks": ["arduino", "espidf"]
+}
