@@ -178,7 +178,9 @@ class CrossPointSettings {
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Nameplate (名牌) sleep screen image rotation, same enum order as ORIENTATION
-  // (0=portrait, 1=landscape CW, 2=inverted, 3=landscape CCW).
+  // (0=portrait, 1=landscape CW, 2=inverted, 3=landscape CCW). The badge is
+  // authored PORTRAIT (480x800), so default to Portrait; the web composer emits a
+  // 480x800 BMP to match.
   uint8_t nameplateOrientation = 0;
   // Sleep screen cover mode settings
   uint8_t sleepScreenCoverMode = FIT;
