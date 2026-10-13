@@ -2697,7 +2697,10 @@ function renderBadgeLayout(){
 
   // --- name (209..337) / title (368..393) / division (413..421) ---------
   ctx.fillStyle='#000'; ctx.textAlign='center';
-  drawFit(name||' ', W/2, 337, RW, 112, '600');
+  // Big by default: allow it almost the full panel width and a taller cap
+  // height than the reference, which lets a short (CJK) name really fill the
+  // band; a long Latin name is still width-limited and just scales down.
+  drawFit(name||' ', W/2, 352, W-16, 140, '700');
   // The job title lives in the black chip lower down, not here, so a long title
   // cannot fight the name for width.
   if(division){
