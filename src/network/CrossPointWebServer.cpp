@@ -337,6 +337,11 @@ CrossPointWebServer::WsUploadStatus CrossPointWebServer::getWsUploadStatus() con
 
 static void sendHtmlContent(WebServer* server, const char* data, size_t len) {
   server->sendHeader("Content-Encoding", "gzip");
+  // Always serve the page from the device. Without this the browser happily
+  // keeps an old build of e.g. the badge page and 'save to device' then writes
+  // an image produced by outdated JavaScript.
+  server->sendHeader("Cache-Control", "no-store, must-revalidate");
+  server->sendHeader("Pragma", "no-cache");
   server->send_P(200, "text/html", data, len);
 }
 
