@@ -610,19 +610,36 @@ void EInkDisplay::resetDisplay() {
   }
 }
 
-void EInkDisplay::waitForRefresh(const char *comment) {
-  pollBusy(comment, "Refresh done");
+void EInkDisplay::waitForRefresh(const char *comment, unsigned long timeoutMs) {
+  pollBusy(comment, "Refresh done", timeoutMs);
 }
 
-void EInkDisplay::pollBusy(const char *comment, const char *completeWord) {
+void EInkDisplay::pollBusy(const char *comment, const char *completeWord, unsigned long timeoutMs) {
   unsigned long start = millis();
   if (!_x3Mode) {
-    // X4: BUSY held HIGH while busy, drops LOW when done. Timeout is bounded
-    // (5s) so a wedged panel (SD/EPD share the SPI bus + the GPIO27 power/reset
-    // rail) can't freeze the UI for 30s; the next refresh recovers.
+    // OnePage/X4-class SSD1677: BUSY is driven HIGH while the controller runs a
+    // waveform and drops LOW when it finishes.
+    //
+    // BUSY does NOT rise the instant MASTER_ACTIVATION returns. Poll for the
+    // HIGH edge first: without this the wait exited immediately whenever the MCU
+    // read BUSY before it rose, and the caller then pushed the next opcode
+    // (analog-off / panel deep sleep) into the middle of a running waveform —
+    // the panel keeps whatever had been driven so far, so the frame comes out
+    // faint or only partially updated. That race is timing/temperature
+    // dependent, which is why it looked intermittent.
+    while (digitalRead(_busy) == LOW) {
+      delay(1);
+      if (millis() - start > 1000) break;  // no work started: treat as a no-op
+    }
+    if (digitalRead(_busy) != HIGH) {
+      return;  // never asserted; skip the completion log
+    }
+    // Wait for the waveform to finish. timeoutMs is per-op: a full refresh is
+    // the longest drive and stretches further when the panel is cold, so the old
+    // fixed 5s cap could cut a legitimate refresh short.
     while (digitalRead(_busy) == HIGH) {
       delay(1);
-      if (millis() - start > 5000)
+      if (millis() - start > timeoutMs)
         break;
     }
   } else {
@@ -815,8 +832,8 @@ void EInkDisplay::triggerRefreshX3(bool turnOffScreen, const char *tag) {
   }
 }
 
-void EInkDisplay::waitWhileBusy(const char *comment) {
-  pollBusy(comment, "Wait complete");
+void EInkDisplay::waitWhileBusy(const char *comment, unsigned long timeoutMs) {
+  pollBusy(comment, "Wait complete", timeoutMs);
 }
 
 void EInkDisplay::initDisplayController() {
@@ -1906,7 +1923,11 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   // Wait for display to finish updating
   if (Serial)
     Serial.printf("[%lu]   Waiting for display refresh...\n", millis());
-  waitWhileBusy(refreshType);
+  // Full refresh is the longest waveform and stretches further when the panel
+  // is cold; give each mode a budget that cannot cut a valid refresh short.
+  const unsigned long refreshTimeoutMs =
+      (mode == FULL_REFRESH) ? 30000UL : (mode == HALF_REFRESH) ? 15000UL : 5000UL;
+  waitWhileBusy(refreshType, refreshTimeoutMs);
 }
 
 void EInkDisplay::setCustomLUT(const bool enabled,

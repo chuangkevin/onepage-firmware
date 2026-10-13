@@ -70,7 +70,7 @@ void SleepActivity::renderCustomSleepScreen() const {
     Bitmap bitmap(file, true);
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       LOG_DBG("SLP", "Loading: /sleep.bmp");
-      renderBitmapSleepScreen(bitmap);
+      renderBitmapSleepScreen(bitmap, true);
       file.close();
       if (dir) dir.close();
       return;
@@ -137,7 +137,7 @@ void SleepActivity::renderCustomSleepScreen() const {
         delay(100);
         Bitmap bitmap(randFile, true);
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-          renderBitmapSleepScreen(bitmap);
+          renderBitmapSleepScreen(bitmap, true);
           randFile.close();
           dir.close();
           return;
@@ -159,10 +159,11 @@ void SleepActivity::renderNameplateSleepScreen() const {
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       const auto prev = renderer.getOrientation();
       renderer.setOrientation(static_cast<GfxRenderer::Orientation>(SETTINGS.nameplateOrientation));
-      renderBitmapSleepScreen(bitmap);
-      // Full refresh to clear ghosting from whatever was on screen before
-      // (the badge is a static image, so the extra refresh time is fine).
-      renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+      renderBitmapSleepScreen(bitmap, true);
+      // Single FULL refresh: the strongest, ghost-free waveform. The previous
+      // HALF-then-FULL pair issued two updates back to back, and the second one
+      // was frequently dropped (the controller had not re-asserted BUSY yet),
+      // so the panel kept the weaker HALF result — the intermittent faint frame.
       renderer.setOrientation(prev);
       file.close();
       return;
@@ -186,10 +187,14 @@ void SleepActivity::renderDefaultSleepScreen() const {
     renderer.invertScreen();
   }
 
-  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  // A sleep screen stays on the panel for a long time, so drive it with the
+  // strong full waveform. HALF is a differential/partial drive: it under-drives
+  // pixels whose target differs a lot from the previous frame, which showed up
+  // as text that looked partially "peeled off".
+  renderer.displayBuffer(HalDisplay::FULL_REFRESH);
 }
 
-void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
+void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, bool fullRefresh) const {
   int x, y;
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
@@ -241,14 +246,16 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
     renderer.invertScreen();
   }
 
+  const auto finalMode = fullRefresh ? HalDisplay::FULL_REFRESH : HalDisplay::HALF_REFRESH;
+
   if (hasGreyscale) {
     // OEM grayscale pipeline base: on X3 this displays the frame with the
     // dedicated "AA-pre-BW(mid)" differential waveform, leaving every pixel
     // in the calibrated state the gray nudge refresh expects; on X4 it is a
     // plain HALF refresh (previous behavior).
-    renderer.displayGrayscaleBase(HalDisplay::HALF_REFRESH);
+    renderer.displayGrayscaleBase(finalMode);
   } else {
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    renderer.displayBuffer(finalMode);
   }
 
   if (hasGreyscale) {
@@ -340,7 +347,7 @@ void SleepActivity::renderCoverSleepScreen() const {
     Bitmap bitmap(file);
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
       LOG_DBG("SLP", "Rendering sleep cover: %s", coverBmpPath.c_str());
-      renderBitmapSleepScreen(bitmap);
+      renderBitmapSleepScreen(bitmap, true);
       return;
     }
   }

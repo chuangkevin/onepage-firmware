@@ -176,8 +176,9 @@ class EInkDisplay {
   void sendCommand(uint8_t command);
   void sendData(uint8_t data);
   void sendData(const uint8_t* data, uint16_t length);
-  void waitForRefresh(const char* comment = nullptr);
-  void waitWhileBusy(const char* comment = nullptr);
+  // timeoutMs bounds the BUSY-active wait (not the initial assert poll).
+  void waitForRefresh(const char* comment = nullptr, unsigned long timeoutMs = 5000);
+  void waitWhileBusy(const char* comment = nullptr, unsigned long timeoutMs = 5000);
   // Shared body for the two waits above. X4 (SSD1677) and X3 (UC81xx-class)
   // use opposite BUSY-line polarities:
   //   X4: active HIGH. BUSY HIGH while working, drops LOW when done.
@@ -185,7 +186,7 @@ class EInkDisplay {
   //                    HIGH when done.
   // The per-panel polling logic therefore stays gated; consolidation here
   // is the function body only.
-  void pollBusy(const char* comment, const char* completeWord);
+  void pollBusy(const char* comment, const char* completeWord, unsigned long timeoutMs = 5000);
   void initDisplayController();
 
   // Low-level display operations

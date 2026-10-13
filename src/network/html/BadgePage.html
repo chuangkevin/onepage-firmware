@@ -63,31 +63,36 @@ const CODE39_PATTERNS=[20957,29783,23639,30485,20951,29813,23669,20855,29789,236
 function render(){
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
 
-  // --- logo (top, centered) ---
-  if(logoImg.complete && logoImg.naturalWidth){
-    const lw=300, lh=Math.round(logoImg.naturalHeight*lw/logoImg.naturalWidth);
-    ctx.drawImage(logoImg,(W-lw)/2,40,lw,lh);
-  }
-
-  // --- photo (middle) ---
+  // --- photo (middle): the ONLY dithered element ---
   const px=60, py=190, pw=W-120, ph=380;
   if(photoImg){
     drawCover(photoImg,px,py,pw,ph,14);
+    // Dither the photo alone, so its midtones survive on a 1-bit panel.
+    // Everything drawn afterwards (logo, name, title, barcode) stays solid
+    // black: dithering glyph strokes turns them into a speckled, half-missing
+    // pattern — the "chipped paint" look.
+    ditherRegion(px,py,pw,ph);
   } else {
     ctx.strokeStyle='#bbb'; ctx.lineWidth=2; ctx.strokeRect(px,py,pw,ph);
     ctx.fillStyle='#bbb'; ctx.font='500 22px sans-serif'; ctx.textAlign='center'; ctx.fillText('尚未上傳照片',W/2,py+ph/2);
   }
 
-  // --- name / title ---
+  // --- logo (top, centered) — solid ---
+  if(logoImg.complete && logoImg.naturalWidth){
+    const lw=300, lh=Math.round(logoImg.naturalHeight*lw/logoImg.naturalWidth);
+    const lx=(W-lw)/2, ly=40;
+    ctx.drawImage(logoImg,lx,ly,lw,lh);
+    solidifyRegion(lx,ly,lw,lh,200);
+  }
+
+  // --- name / title — solid ---
   const name=(document.getElementById('name').value||'').trim();
   const title=(document.getElementById('title').value||'').trim();
   const carrier=(document.getElementById('carrier').value||'').trim().toUpperCase();
   ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   drawFit(name||' ', W/2, 610, W-60, 62, '700');
-  ctx.fillStyle='#333';
+  ctx.fillStyle='#000';
   drawFit(title||' ', W/2, 655, W-80, 32, '500');
-
-  binarize();
 
   // Draw the barcode AFTER photo dithering so every bar remains solid black
   // and the white quiet zones stay clean for phone scanners.
@@ -142,21 +147,45 @@ function drawFit(text,x,y,maxW,maxH,weight){
   ctx.fillText(text,x,y);
 }
 
-// Grayscale + Floyd–Steinberg to 1-bit, in place.
-function binarize(){
-  const img=ctx.getImageData(0,0,W,H), d=img.data;
-  const g=new Float32Array(W*H);
+// Force one rectangle to pure black/white by luminance (no error diffusion).
+// Used for the colour logo: makeBmp() classifies each pixel by its red channel
+// alone, so anything not turned into pure black here would be written as white
+// and the logo would vanish from the panel image.
+function solidifyRegion(rx,ry,rw,rh,threshold){
+  const x0=Math.max(0,Math.floor(rx)), y0=Math.max(0,Math.floor(ry));
+  const x1=Math.min(W,Math.ceil(rx+rw)), y1=Math.min(H,Math.ceil(ry+rh));
+  const iw=x1-x0, ih=y1-y0;
+  if(iw<=0||ih<=0) return;
+  const img=ctx.getImageData(x0,y0,iw,ih), d=img.data;
+  for(let p=0;p<iw*ih;p++){
+    const i=p*4;
+    const lum=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    const v=lum<threshold?0:255;
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,x0,y0);
+}
+
+// Grayscale + Floyd–Steinberg to 1-bit, limited to one rectangle.
+// Only the photo is passed through this; text and logo must stay solid.
+function ditherRegion(rx,ry,rw,rh){
+  const x0=Math.max(0,Math.floor(rx)), y0=Math.max(0,Math.floor(ry));
+  const x1=Math.min(W,Math.ceil(rx+rw)), y1=Math.min(H,Math.ceil(ry+rh));
+  const iw=x1-x0, ih=y1-y0;
+  if(iw<=0||ih<=0) return;
+  const img=ctx.getImageData(x0,y0,iw,ih), d=img.data;
+  const g=new Float32Array(iw*ih);
   for(let i=0,p=0;i<d.length;i+=4,p++) g[p]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x++){
-      const i=y*W+x; const old=g[i]; const nv=old<128?0:255; const err=old-nv;
+  for(let y=0;y<ih;y++){
+    for(let x=0;x<iw;x++){
+      const i=y*iw+x; const old=g[i]; const nv=old<128?0:255; const err=old-nv;
       g[i]=nv;
-      if(x+1<W) g[i+1]+=err*7/16;
-      if(y+1<H){ if(x>0)g[i+W-1]+=err*3/16; g[i+W]+=err*5/16; if(x+1<W)g[i+W+1]+=err*1/16; }
+      if(x+1<iw) g[i+1]+=err*7/16;
+      if(y+1<ih){ if(x>0)g[i+iw-1]+=err*3/16; g[i+iw]+=err*5/16; if(x+1<iw)g[i+iw+1]+=err*1/16; }
     }
   }
-  for(let p=0;p<W*H;p++){ const i=p*4; const v=g[p]<128?0:255; d[i]=d[i+1]=d[i+2]=v; }
-  ctx.putImageData(img,0,0);
+  for(let p=0;p<iw*ih;p++){ const i=p*4; const v=g[p]<128?0:255; d[i]=d[i+1]=d[i+2]=v; }
+  ctx.putImageData(img,x0,y0);
 }
 
 function makeBmp(){
