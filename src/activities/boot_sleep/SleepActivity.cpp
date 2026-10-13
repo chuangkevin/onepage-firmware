@@ -30,13 +30,17 @@ void SleepActivity::onEnter() {
     return renderLastScreenSleepScreen();
   }
 
-  // Show popup with reader orientation only when going to sleep from reader
+  // Do NOT draw an "entering sleep" popup here. On OnePage the EPD shares its
+  // power rail (GPIO27) and SPI bus with the SD card, and this popup needs CJK
+  // glyphs that are loaded on demand from the SD. Those reads land immediately
+  // before the first sleep refresh and disturb the shared rail: with a card
+  // mounted the very next refresh wedges the EPD (BUSY never releases, and even
+  // a soft reset is ignored). Verified by A/B on hardware -- identical firmware
+  // wedges with the card in and completes in 419/3543 ms with it out. Cosmetic
+  // only, so drop it and go straight to the sleep screen.
   if (APP_STATE.lastSleepFromReader) {
     ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
-    GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
     renderer.setOrientation(GfxRenderer::Orientation::Portrait);
-  } else {
-    GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
   }
 
   switch (SETTINGS.sleepScreen) {
