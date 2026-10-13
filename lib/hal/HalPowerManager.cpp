@@ -60,6 +60,16 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
     gpio.update();
   }
 
+#ifdef ONEPAGE_DEBUG_NO_SLEEP
+  // Diagnostic build: never enter deep sleep. A sleeping C6 drops the USB
+  // Serial/JTAG peripheral, so the device disappears from the host and looks
+  // hung even when it is only asleep; keeping it awake keeps the serial port
+  // permanently available and makes a genuine hang observable and recoverable
+  // without a power cycle. The panel was already parked by display.deepSleep().
+  LOG_DBG("PWR", "deep sleep suppressed (ONEPAGE_DEBUG_NO_SLEEP); staying awake");
+  return;
+#endif
+
 #ifdef ENABLE_SERIAL_LOG
   // Tear down HWCDC so the host sees a clean disconnect and the peripheral
   // doesn't hold power domains that interfere with USB-powered GPIO wake.
