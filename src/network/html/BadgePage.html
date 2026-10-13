@@ -27,6 +27,15 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
     <label>照片 <input type="file" id="photo" accept="image/*"></label>
     <label>姓名 <input type="text" id="name" maxlength="12" placeholder="你的名字"></label>
     <label>職稱 <input type="text" id="title" maxlength="20" placeholder="職稱"></label>
+    <label>排版 <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="classic">經典（照片在上、大字在下）</option>
+      <option value="badge">工牌（同事版：黑底標題列＋大名字＋QR）</option>
+    </select></label>
+    <div id="badgeOnly" style="display:none">
+      <label>員工編號 <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
+      <label>部門／標語 <input type="text" id="division" maxlength="40" placeholder="SCIENCE &amp; TECHNOLOGY DIVISION" spellcheck="false"></label>
+      <label>權限等級 <input type="text" id="clearance" maxlength="6" placeholder="7" spellcheck="false"></label>
+    </div>
     <label>條碼類型 <select id="codeType" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
       <option value="barcode">一維碼（Code 39）</option>
       <option value="qr">QR Code</option>
@@ -34,8 +43,8 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
     </select></label>
     <label>內容（載具號碼或網址） <input type="text" id="codeValue" maxlength="120" placeholder="/SM6OLEQ 或 https://…" spellcheck="false"></label>
     <label>照片抖色顆粒 <select id="ditherCell" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="1">細 1px（細節最多，面板最容易糊）</option>
-      <option value="2">中 2px</option>
+      <option value="1">細 1px（不建議，這片面板會糊）</option>
+      <option value="2" selected>中 2px（建議起點）</option>
       <option value="3">粗 3px（面板最吃得下）</option>
     </select></label>
     <p id="carrierStatus" class="small">一維碼請填 / 開頭 8 碼載具號；QR Code 可填任意網址或文字。</p>
@@ -2364,6 +2373,10 @@ function saveForm(){
     localStorage.setItem(LS_KEY, JSON.stringify({
       name:document.getElementById('name').value,
       title:document.getElementById('title').value,
+      layout:document.getElementById('layout').value,
+      agentId:document.getElementById('agentId').value,
+      division:document.getElementById('division').value,
+      clearance:document.getElementById('clearance').value,
       codeType:document.getElementById('codeType').value,
       codeValue:document.getElementById('codeValue').value,
       ditherCell:document.getElementById('ditherCell').value,
@@ -2377,6 +2390,10 @@ function loadForm(){
   if(d){
     if(d.name) document.getElementById('name').value=d.name;
     if(d.title) document.getElementById('title').value=d.title;
+    if(d.layout){ document.getElementById('layout').value=d.layout; syncLayoutFields(); }
+    if(d.agentId) document.getElementById('agentId').value=d.agentId;
+    if(d.division) document.getElementById('division').value=d.division;
+    if(d.clearance) document.getElementById('clearance').value=d.clearance;
     if(d.codeType) document.getElementById('codeType').value=d.codeType;
     if(d.codeValue) document.getElementById('codeValue').value=d.codeValue;
     if(d.ditherCell) document.getElementById('ditherCell').value=d.ditherCell;
@@ -2408,6 +2425,9 @@ document.getElementById('title').oninput=()=>{saveForm();render();};
 document.getElementById('codeType').onchange=()=>{saveForm();render();};
 document.getElementById('codeValue').oninput=()=>{saveForm();render();};
 document.getElementById('ditherCell').onchange=()=>{saveForm();render();};
+document.getElementById('layout').onchange=()=>{saveForm();syncLayoutFields();render();};
+for(const id of ['agentId','division','clearance']) document.getElementById(id).oninput=()=>{saveForm();render();};
+function syncLayoutFields(){document.getElementById('badgeOnly').style.display=document.getElementById('layout').value==='badge'?'block':'none';}
 
 // Code 39 narrow/wide encodings. Mobile barcodes use '/' followed by seven
 // uppercase alphanumeric characters; the numeric patterns are the standard
@@ -2420,6 +2440,7 @@ const CODE39_PATTERNS=[20957,29783,23639,30485,20951,29813,23669,20855,29789,236
 
 function render(){
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  if(document.getElementById('layout').value==='badge'){ renderBadgeLayout(); return; }
 
   // --- photo (middle): the ONLY dithered element ---
   // Layout depends on what goes at the bottom: a square QR wants more height, so
@@ -2598,6 +2619,187 @@ function ditherRegion(rx,ry,rw,rh,cell){
     }
   }
   ctx.putImageData(img,x0,y0);
+}
+
+
+// ===========================================================================
+// "工牌" layout, modelled on the community badge the customer supplied:
+// black title band with the logo reversed out, a rule-separated meta row, a
+// huge name, title, wide-tracked division, a clearance row, the code with
+// corner brackets, and a 45-degree hatched footer. Everything is pure black or
+// white with >=2px strokes, because that is what this 1-bit panel reproduces
+// cleanly (a dithered photo is the only element that cannot).
+// ===========================================================================
+function renderBadgeLayout(){
+  const name=(document.getElementById('name').value||'').trim();
+  const title=(document.getElementById('title').value||'').trim();
+  const agentId=(document.getElementById('agentId').value||'').trim();
+  const division=(document.getElementById('division').value||'').trim();
+  const clearance=(document.getElementById('clearance').value||'').trim();
+  const codeType=document.getElementById('codeType').value;
+  const codeValue=(document.getElementById('codeValue').value||'').trim();
+  const ditherCell=parseInt(document.getElementById('ditherCell').value||'1',10);
+  const status=document.getElementById('carrierStatus');
+
+  const M=28;                       // side margin, as the reference uses
+  let y=0;
+
+  // --- black title band -------------------------------------------------
+  const HEAD=150;
+  ctx.fillStyle='#000'; ctx.fillRect(0,y,W,HEAD);
+  if(logoImg.complete&&logoImg.naturalWidth){
+    const lh=64, lw=Math.round(logoImg.naturalWidth*lh/logoImg.naturalHeight);
+    const ly=y+30;
+    ctx.drawImage(logoImg,M,ly,lw,lh);
+    reverseInPlace(M,ly,lw,lh);      // black mark -> white on the black band
+  }
+  ctx.fillStyle='#fff';
+  ctx.font='700 12px "PingFang TC","Noto Sans TC",sans-serif';
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillText('授權人員專用', M, y+HEAD-18);
+  y+=HEAD;
+
+  // --- meta row + rule --------------------------------------------------
+  ctx.fillStyle='#000';
+  ctx.font='700 14px "PingFang TC","Noto Sans TC",sans-serif';
+  ctx.textAlign='left';
+  if(agentId) ctx.fillText('員工編號  '+agentId, M, y+26);
+  ctx.textAlign='right';
+  ctx.fillText('ACTIVE', W-M, y+26);
+  ctx.fillRect(M, y+42, W-2*M, 2);
+  y+=44;
+
+  // --- photo (optional; the reference has none) -------------------------
+  if(photoImg){
+    const ph=190, pw=W-2*M;
+    drawCover(photoImg,M,y+12,pw,ph,10);
+    ditherRegion(M,y+12,pw,ph,ditherCell);
+    y+=ph+20;
+  }
+
+  // --- name / title / division -----------------------------------------
+  ctx.fillStyle='#000';
+  ctx.textAlign='center';
+  const nameBase = y+96;
+  drawFit(name||' ', W/2, nameBase, W-2*M, 96, '700');
+  ctx.fillStyle='#000';
+  drawFit(title||' ', W/2, nameBase+52, W-2*M, 34, '500');
+  if(division){
+    const prev=ctx.fillStyle;
+    ctx.font='500 13px "PingFang TC","Noto Sans TC",sans-serif';
+    ctx.textAlign='center';
+    drawTracked(division, W/2, nameBase+80, 4);
+    ctx.fillStyle=prev;
+  }
+  y=nameBase+96;
+
+  // --- clearance row ----------------------------------------------------
+  ctx.fillStyle='#000';
+  ctx.fillRect(M, y, W-2*M, 2);
+  const chipW=130, chipY=y+16, chipH=38;
+  ctx.font='700 14px "PingFang TC","Noto Sans TC",sans-serif';
+  ctx.textAlign='left';
+  ctx.fillText('權限等級', M, chipY+26);
+  if(clearance){
+    ctx.fillRect(W-M-chipW, chipY, chipW, chipH);
+    ctx.fillStyle='#fff';
+    ctx.font='700 20px "PingFang TC","Noto Sans TC",sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(clearance, W-M-chipW/2, chipY+27);
+    ctx.fillStyle='#000';
+  }
+  y=chipY+chipH+16;
+  ctx.fillRect(M, y, W-2*M, 2);
+  y+=18;
+
+  // --- machine-readable code -------------------------------------------
+  const bandH = (codeType==='qr') ? 186 : 118;
+  if(codeType==='none'||!codeValue){
+    status.textContent = codeType==='none' ? '不顯示條碼。' : '填入內容才會顯示條碼／QR Code。';
+    y+=bandH;
+  }else if(codeType==='barcode'){
+    const v=codeValue.toUpperCase();
+    if(!/^\/[A-Z0-9]{7}$/.test(v) && !/^[0-9A-Z.\- $/+%]+$/.test(v)){
+      status.textContent='一維碼只支援 0-9 A-Z 與 - . 空白 $ / + %，例如 /SM6OLEQ。';
+      y+=bandH;
+    }else{
+      status.textContent='一維碼預覽：'+v;
+      drawCode39(v, M, y, W-2*M, bandH);
+      y+=bandH;
+    }
+  }else{
+    status.textContent='QR Code 預覽：'+codeValue;
+    const size=bandH, x=(W-size)/2;
+    drawQr(codeValue, x, y, size);
+    drawQrBrackets(x, y, size);      // corner brackets, as the reference has
+    y+=bandH;
+  }
+
+  // --- url / payload caption -------------------------------------------
+  if(codeValue){
+    ctx.fillStyle='#000';
+    ctx.font='700 13px "PingFang TC","Noto Sans TC",sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(codeValue, W/2, y+16);
+    y+=26;
+  }
+
+  // --- hatched footer ---------------------------------------------------
+  hatchFooter(W,y2(W,H));
+  solidifyRegion(0,0,W,H,200);
+}
+function y2(){ return H; }
+
+// Reverse the pixels of one rectangle in place: dark -> white, everything else
+// -> black. Used to draw the logo reversed out of the black title band, which
+// is what the reference achieves with `filter: brightness(0) invert(1)`.
+function reverseInPlace(rx,ry,rw,rh){
+  const x0=Math.max(0,Math.floor(rx)), y0=Math.max(0,Math.floor(ry));
+  const x1=Math.min(W,Math.ceil(rx+rw)), y1=Math.min(H,Math.ceil(ry+rh));
+  const iw=x1-x0, ih=y1-y0;
+  if(iw<=0||ih<=0) return;
+  const img=ctx.getImageData(x0,y0,iw,ih), d=img.data;
+  for(let p=0;p<iw*ih;p++){
+    const i=p*4;
+    const lum=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    const v=lum<128?255:0;
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,x0,y0);
+}
+
+// Centre-draw text with extra letter spacing (the reference's letter-spacing).
+function drawTracked(text,cx,baseY,spacing){
+  let w=0;
+  for(const ch of text) w+=ctx.measureText(ch).width+spacing;
+  w-=spacing;
+  let x=cx-w/2;
+  const prevAlign=ctx.textAlign; ctx.textAlign='left';
+  for(const ch of text){ ctx.fillText(ch,x,baseY); x+=ctx.measureText(ch).width+spacing; }
+  ctx.textAlign=prevAlign;
+}
+
+// Four corner brackets around the QR, as the reference draws them.
+function drawQrBrackets(x,y,size){
+  const L=26, T=5;
+  ctx.fillStyle='#000';
+  ctx.fillRect(x,y,L,T);            ctx.fillRect(x,y,T,L);
+  ctx.fillRect(x+size-L,y,L,T);     ctx.fillRect(x+size-T,y,T,L);
+  ctx.fillRect(x,y+size-T,L,T);     ctx.fillRect(x,y+size-T,T,L);
+  ctx.fillRect(x+size-L,y+size-T,L,T); ctx.fillRect(x+size-T,y+size-T,T,L);
+}
+
+// 10px black / 10px white at 45 degrees, filling the last FOOT px of the panel.
+function hatchFooter(){
+  const FOOT=16, top=H-FOOT, step=10;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,top,W,FOOT);
+  ctx.fillStyle='#000';
+  for(let x=-FOOT;x<W+FOOT;x+=step*2){
+    ctx.beginPath();
+    ctx.moveTo(x,top); ctx.lineTo(x+step,top);
+    ctx.lineTo(x+step-FOOT,top+FOOT); ctx.lineTo(x-FOOT,top+FOOT);
+    ctx.closePath(); ctx.fill();
+  }
 }
 
 function makeBmp(){
