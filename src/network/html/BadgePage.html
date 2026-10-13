@@ -64,7 +64,9 @@ function render(){
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
 
   // --- photo (middle): the ONLY dithered element ---
-  const px=60, py=190, pw=W-120, ph=380;
+  // Kept clear of the name band below: the name baseline sits at 585 with a
+  // 62px cap height, so the photo must end above ~523.
+  const px=60, py=170, pw=W-120, ph=340;
   if(photoImg){
     drawCover(photoImg,px,py,pw,ph,14);
     // Dither the photo alone, so its midtones survive on a 1-bit panel.
@@ -90,9 +92,9 @@ function render(){
   const title=(document.getElementById('title').value||'').trim();
   const carrier=(document.getElementById('carrier').value||'').trim().toUpperCase();
   ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-  drawFit(name||' ', W/2, 610, W-60, 62, '700');
+  drawFit(name||' ', W/2, 585, W-60, 62, '700');
   ctx.fillStyle='#000';
-  drawFit(title||' ', W/2, 655, W-80, 32, '500');
+  drawFit(title||' ', W/2, 632, W-80, 32, '500');
 
   // Draw the barcode AFTER photo dithering so every bar remains solid black
   // and the white quiet zones stay clean for phone scanners.
@@ -103,9 +105,9 @@ function render(){
     status.textContent='格式不符：請輸入 / 加 7 碼英數字，例如 /SM6OLEQ。';
   }else{
     status.textContent='條碼預覽：'+carrier;
-    drawCode39(carrier,30,690,W-60,54);
+    drawCode39(carrier,30,660,W-60,54);
     ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.font='20px monospace'; ctx.fillText(carrier,W/2,782);
+    ctx.font='20px monospace'; ctx.fillText(carrier,W/2,752);
   }
 }
 
