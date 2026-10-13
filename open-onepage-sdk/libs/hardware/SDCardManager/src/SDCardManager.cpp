@@ -231,7 +231,8 @@ void SDCardManager::migrateInternalToSd() {
   }
   // Mount the internal volume WITHOUT stealing the current working volume.
   if (!internalVol.begin(&internalDev, false) && !internalVol.begin(&internalDev, false, 0, 0)) {
-    if (Serial) Serial.println("[SD] migrate: internal volume not mountable");
+    // Nothing to migrate: the internal volume was never formatted (the common
+    // case once a microSD is in use). Not an error — stay quiet.
     return;
   }
   unsigned copied = 0, failed = 0;
