@@ -192,6 +192,9 @@ class EInkDisplay {
   // is the function body only.
   void pollBusy(const char* comment, const char* completeWord, unsigned long timeoutMs = 5000);
   void initDisplayController();
+  // Full recovery for a wedged controller: soft reset + re-init + repaint the
+  // frame we still hold in frameBuffer. Called when BUSY never releases.
+  void recoverPanel();
 
   // Low-level display operations
   void setRamArea(uint16_t x, uint16_t y, uint16_t w, uint16_t h);

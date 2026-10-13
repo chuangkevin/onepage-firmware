@@ -1938,15 +1938,11 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   waitWhileBusy(refreshType, 5000);
 
   if (_busyTimedOut) {
-    // The controller never finished the waveform (BUSY stayed asserted past the
-    // bound). Left alone it stays wedged: the next frame is pushed into a busy
-    // controller, and the panel is still mid-operation when its rail is cut for
-    // deep sleep -- which is what makes the screen come out patchy AND leaves
-    // the device unable to wake. Re-assert power-on with the same mode bits and
-    // activate again; the controller restarts the waveform from the RAM it
-    // already holds, so no frame data is lost.
-    if (Serial)
-      Serial.printf("[%lu]   BUSY stuck after %s refresh; re-arming panel\n", millis(), refreshType);
+    // BUSY never released, so the waveform did not finish. Re-issuing
+    // MASTER_ACTIVATION does not clear this (verified on the device: the retry
+    // also sat at exactly 5001 ms). A stuck SSD1677 only comes back after a
+    // reset, so run the full recovery and repaint, then activate once more.
+    recoverPanel();
     sendCommand(CMD_WRITE_TEMP);
     sendData(0x19);
     sendCommand(CMD_DISPLAY_UPDATE_CTRL2);
@@ -1954,8 +1950,38 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
     sendCommand(CMD_MASTER_ACTIVATION);
     waitWhileBusy(refreshType, 5000);
     if (_busyTimedOut && Serial)
-      Serial.printf("[%lu]   panel still busy after re-arm\n", millis());
+      Serial.printf("[%lu]   panel still busy after reset\n", millis());
+    else if (Serial)
+      Serial.printf("[%lu]   panel recovered\n", millis());
   }
+}
+
+// A stuck BUSY line means the controller never completed the waveform and will
+// not accept another one. Re-sending the activation command does not help; only
+// a reset clears it. Run initDisplayController() (which issues CMD_SOFT_RESET
+// and re-programs every register, including the RAM window), then put the frame
+// we were showing back from the buffer we still hold, so the retry paints the
+// intended image rather than whatever the reset left in RAM.
+void EInkDisplay::recoverPanel() {
+  if (Serial)
+    Serial.printf("[%lu]   panel wedged (BUSY never released); soft-resetting controller\n", millis());
+  _busyTimedOut = false;
+
+  initDisplayController();
+
+  // Force the next activation to assert CLOCK_ON/ANALOG_ON again: the reset
+  // dropped the analog rails.
+  isScreenOn = false;
+
+  setRamArea(0, 0, displayWidth, displayHeight);
+  if (frameBuffer != nullptr) {
+    writeRamBuffer(CMD_WRITE_RAM_BW, frameBuffer, bufferSize);
+    writeRamBuffer(CMD_WRITE_RAM_RED, frameBuffer, bufferSize);
+  }
+
+  _busyTimedOut = false;
+  if (Serial)
+    Serial.printf("[%lu]   panel re-initialized, frame restored\n", millis());
 }
 
 void EInkDisplay::setCustomLUT(const bool enabled,
