@@ -629,14 +629,14 @@ void EInkDisplay::pollBusy(const char *comment, const char *completeWord, unsign
     // dependent, which is why it looked intermittent.
     while (digitalRead(_busy) == LOW) {
       delay(1);
-      if (millis() - start > 1000) break;  // no work started: treat as a no-op
+      if (millis() - start > 50) break;  // no work started: treat as a no-op
     }
     if (digitalRead(_busy) != HIGH) {
       return;  // never asserted; skip the completion log
     }
-    // Wait for the waveform to finish. timeoutMs is per-op: a full refresh is
-    // the longest drive and stretches further when the panel is cold, so the old
-    // fixed 5s cap could cut a legitimate refresh short.
+    // Wait for the waveform to finish. The bound stays short (5s at the call
+    // sites): a wedged BUSY line must never freeze the UI, and the measured
+    // full refresh is ~3.8s.
     while (digitalRead(_busy) == HIGH) {
       delay(1);
       if (millis() - start > timeoutMs)
@@ -1923,11 +1923,10 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   // Wait for display to finish updating
   if (Serial)
     Serial.printf("[%lu]   Waiting for display refresh...\n", millis());
-  // Full refresh is the longest waveform and stretches further when the panel
-  // is cold; give each mode a budget that cannot cut a valid refresh short.
-  const unsigned long refreshTimeoutMs =
-      (mode == FULL_REFRESH) ? 30000UL : (mode == HALF_REFRESH) ? 15000UL : 5000UL;
-  waitWhileBusy(refreshType, refreshTimeoutMs);
+  // Keep the bound short: a wedged BUSY line must never freeze the UI. The
+  // measured full refresh here is ~3.8 s, so 5 s leaves margin without the
+  // 30 s stall the panel can otherwise impose.
+  waitWhileBusy(refreshType, 5000);
 }
 
 void EInkDisplay::setCustomLUT(const bool enabled,
