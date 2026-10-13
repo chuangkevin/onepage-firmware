@@ -35,8 +35,8 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
       <option value="badge">工牌（同事版：黑底標題列＋大名字＋QR）</option>
     </select></label>
     <div id="badgeOnly" style="display:none">
-      <label>標題列主字（不填＝用 logo） <input type="text" id="headMain" maxlength="14" placeholder="例：KEVIN" spellcheck="false"></label>
-      <label>標題列副字（小字、字距拉開） <input type="text" id="headSub" maxlength="30" placeholder="例：INTERAGENT 授權人員" spellcheck="false"></label>
+      <label>標題列主字（不填＝用 logo） <input type="text" id="headMain" maxlength="14" placeholder="例：INTERAGENT" spellcheck="false"></label>
+      <label>標題列副字（小字、字距拉開） <input type="text" id="headSub" maxlength="30" placeholder="例：STAFF IDENTIFICATION" spellcheck="false"></label>
       <label>員工編號 <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
       <label>部門／標語 <input type="text" id="division" maxlength="40" placeholder="SCIENCE &amp; TECHNOLOGY DIVISION" spellcheck="false"></label>
       <label>權限等級 <input type="text" id="clearance" maxlength="6" placeholder="7" spellcheck="false"></label>
@@ -2684,12 +2684,12 @@ function renderBadgeLayout(){
   }
   ctx.fillStyle='#fff';
   ctx.font='700 12px '+CJK; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  drawTracked(headSub||'授權人員專用', M, 138, 2, 'left');
+  drawTracked(headSub||'STAFF IDENTIFICATION', M, 138, 2, 'left');
 
   // --- meta row (text 164..175) + rule at y 190 -------------------------
   ctx.fillStyle='#000';
   ctx.font='700 14px '+CJK; ctx.textAlign='left';
-  if(agentId) ctx.fillText('員工編號  '+agentId, M, 175);
+  if(agentId) ctx.fillText('EMPLOYEE ID  '+agentId, M, 175);
   ctx.textAlign='right'; ctx.fillText('ACTIVE', W-M, 175);
   ctx.fillRect(M,190,RW,2);
 
@@ -2707,7 +2707,7 @@ function renderBadgeLayout(){
   ctx.fillStyle='#000';
   ctx.fillRect(M,443,RW,2);
   ctx.font='600 14px '+CJK; ctx.textAlign='left';
-  ctx.fillText('職稱', M, 481);
+  ctx.fillText('TITLE', M, 481);
   // Black chip on the right, sized to the title so it always ends flush with the
   // content box, exactly where the reference puts its LEVEL badge.
   const chipY=456, chipH=40;
@@ -2736,7 +2736,10 @@ function renderBadgeLayout(){
       status.textContent='一維碼只支援 0-9 A-Z 與 - . 空白 $ / + %，例如 /SM6OLEQ。';
     }else{
       status.textContent='一維碼預覽：'+v;
-      drawCode39(v, bx+6, by+40, bs-12, 150);
+      // A 1D symbol is wide and short: give it the whole content width and a
+      // tall bar height, not the square QR box (which collapsed every bar to
+      // a single pixel). Vertically centred in the code band.
+      drawCode39(v, M, 556, RW, 176);
     }
   }else{
     status.textContent='QR Code 預覽：'+codeValue;
