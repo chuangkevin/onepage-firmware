@@ -5,6 +5,8 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Logging.h>
+#include <esp_task_wdt.h>
 #include <Txt.h>
 #include <Xtc.h>
 
@@ -247,6 +249,39 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, bool fullRefre
   }
 
   const auto finalMode = fullRefresh ? HalDisplay::FULL_REFRESH : HalDisplay::HALF_REFRESH;
+
+#ifdef DUMP_FRAME_ON_NAMEPLATE
+  // Diagnostic: hand the framebuffer back over USB so it can be decoded into a
+  // picture on the host. A hash only proves the pipeline is reproducible, not
+  // that the picture is right; this shows the actual pixels the panel gets.
+  {
+    const uint8_t* fb = renderer.getFrameBuffer();
+    const size_t n = renderer.getBufferSize();
+    logSerial.printf("\n@@FB_BEGIN %u %u %u %u@@\n", static_cast<unsigned>(n),
+                     static_cast<unsigned>(renderer.getScreenWidth()),
+                     static_cast<unsigned>(renderer.getScreenHeight()),
+                     static_cast<unsigned>(renderer.getOrientation()));
+    char rec[192];
+    for (size_t off = 0; off < n; off += 64) {
+      const size_t len = (n - off < 64) ? (n - off) : 64;
+      int l = snprintf(rec, sizeof(rec), "@@FB_DATA %u ", static_cast<unsigned>(off));
+      for (size_t i = 0; i < len; ++i) {
+        l += snprintf(rec + l, sizeof(rec) - l, "%02x", fb[off + i]);
+      }
+      l += snprintf(rec + l, sizeof(rec) - l, "@@\n");
+      size_t sent = 0;
+      const unsigned long t0 = millis();
+      while (sent < static_cast<size_t>(l) && millis() - t0 < 1000) {
+        sent += logSerial.write(reinterpret_cast<const uint8_t*>(rec) + sent, l - sent);
+        delay(1);
+      }
+      esp_task_wdt_reset();
+      delay(3);
+    }
+    logSerial.printf("@@FB_END %u@@\n", static_cast<unsigned>(n));
+    logSerial.flush();
+  }
+#endif
 
 #ifdef DIAG_NAMEPLATE_FRAME
   uint32_t frameHash = 2166136261u;
