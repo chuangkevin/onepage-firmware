@@ -53,6 +53,15 @@ class SDCardManager {
   // clear the dirty flag. Never deletes anything on either side.
   void migrateInternalToSd();
 
+  // Locate the partition that hosts the internal store (app1, >6 MB).
+  const esp_partition_t* internalPartition();
+  // Mount the internal volume, initialising the backing device on first use.
+  // Idempotent; safe to call while the microSD is the active volume.
+  bool ensureInternalMounted();
+  // When the microSD is active but carries no /.fonts, copy the CJK font tree
+  // out of the internal image onto the card so the UI can render Chinese.
+  void provisionStorageAssets();
+
   static SDCardManager& getInstance() { return instance; }
 
  private:
@@ -69,6 +78,7 @@ class SDCardManager {
   SdFat sd;
   FsVolume internalVol;
   FlashBlockDevice internalDev;
+  bool internalDevReady = false;
 };
 
 #define SdMan SDCardManager::getInstance()

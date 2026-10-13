@@ -416,8 +416,22 @@ void setup() {
   }
 #endif
 
-  SETTINGS.loadFromFile();
+  const bool settingsLoaded = SETTINGS.loadFromFile();
 #ifdef ONEPAGE_C61
+  // A malformed settings.json (seen in the field: a key mangled into
+  // `dering":0`, missing its opening quote) makes deserializeJson fail, so
+  // loadFromFile returns false and EVERY boot silently falls back to defaults —
+  // which is why the sleep-screen/nameplate choice never stuck. Rewrite a valid
+  // file, pinned to the settings this fleet standardises on.
+  if (!settingsLoaded) {
+    SETTINGS.language = static_cast<uint8_t>(Language::ZH_HANT);
+    SETTINGS.sleepTimeoutMinutes = 30;
+    snprintf(SETTINGS.uiFontFamilyName, sizeof(SETTINGS.uiFontFamilyName), "%s", "PingFangTC");
+    snprintf(SETTINGS.sdFontFamilyName, sizeof(SETTINGS.sdFontFamilyName), "%s", "PingFangTC");
+    SETTINGS.uiFontSize = 12;
+    LOG_INF("MAIN", "settings unreadable or absent; wrote a fresh file (zh-Hant, PingFangTC)");
+    SETTINGS.saveToFile();
+  }
   // OnePage bringup: force front buttons to a 1:1 layout (physical BACK/CONFIRM/
   // LEFT/RIGHT = logical), overriding any X4-specific mapping carried in a
   // settings.bin copied from another device.

@@ -36,6 +36,10 @@ void nvsSetDirty(bool value) {
   prefs.putBool(kNvsDirtyKey, value);
   prefs.end();
 }
+
+// Defined further down; declared here so the provisioning helper above them can
+// use them.
+void copyTreeFiles(FsVolume& src, FsVolume& dst, const char* path, unsigned& copied, unsigned& failed);
 }  // namespace
 
 SDCardManager SDCardManager::instance;
@@ -74,6 +78,8 @@ bool SDCardManager::begin() {
     // Was anything written while running on internal storage? If so, copy it
     // out to the card now (copy-only, verified).
     migrateInternalToSd();
+    // Make sure the card carries the CJK font shipped in the internal image.
+    provisionStorageAssets();
     return true;
   }
 
@@ -97,7 +103,7 @@ void SDCardManager::switchToInternal() {
   usingInternal = true;
 }
 
-bool SDCardManager::beginInternal() {
+const esp_partition_t* SDCardManager::internalPartition() {
   // SdFat's FAT formatter refuses volumes <= 6 MB ("Card is too small"), so the
   // 3.4 MB `spiffs` partition is unusable as-is. app1 — the OTA backup slot,
   // 6.25 MB, currently all 0xFF and never booted (otadata still selects app0) —
@@ -108,41 +114,68 @@ bool SDCardManager::beginInternal() {
   if (part == nullptr) {
     part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
   }
-  if (part == nullptr || part->size <= 6u * 1024u * 1024u) {
-    if (Serial) Serial.printf("[SD] no usable internal storage partition (need > 6MB)\n");
-    return false;
-  }
-  if (!internalDev.begin(part)) {
-    return false;
-  }
+  if (part == nullptr || part->size <= 6u * 1024u * 1024u) return nullptr;
+  return part;
+}
 
-  // Try existing FAT first (fast path on every boot after the first).
+bool SDCardManager::ensureInternalMounted() {
+  if (!internalDevReady) {
+    const esp_partition_t* part = internalPartition();
+    if (part == nullptr) return false;
+    if (!internalDev.begin(part)) return false;
+    internalDevReady = true;
+  }
   // Two layouts are accepted: an MBR-partitioned volume (what SdFat's own
   // FatFormatter writes) and a partitionless "superfloppy" volume (what
   // mtools/mformat produces, used to preload fonts from the flasher).
-  if (internalVol.begin(&internalDev)) {
-    return true;
-  }
-  if (internalVol.begin(&internalDev, true, 0, 0)) {
-    return true;
-  }
+  // setCwv=false: mounting must not steal SdFat's current-working-volume from
+  // the microSD while that is the active volume.
+  if (internalVol.begin(&internalDev, false)) return true;
+  if (internalVol.begin(&internalDev, false, 0, 0)) return true;
+  return false;
+}
 
-  // Not formatted yet: format once, then mount.
-  if (Serial) Serial.println("[SD] formatting internal storage...");
-  uint8_t* work = static_cast<uint8_t*>(malloc(4096));
-  if (work == nullptr) {
-    return false;
+void SDCardManager::provisionStorageAssets() {
+  if (usingInternal) return;
+  if (vol().exists("/.fonts")) return;  // the card already carries fonts
+  if (!ensureInternalMounted()) return;
+  unsigned copied = 0, failed = 0;
+  if (internalVol.exists("/.fonts")) {
+    copyTreeFiles(internalVol, sd, "/.fonts", copied, failed);
   }
-  FatFormatter formatter;
-  const bool formatted = formatter.format(&internalDev, work);
-  free(work);
-  if (!formatted) {
-    if (Serial) Serial.println("[SD] internal storage format failed");
-    return false;
-  }
-  if (!internalVol.begin(&internalDev)) {
-    if (Serial) Serial.println("[SD] internal storage mount failed after format");
-    return false;
+  internalVol.end();
+  sd.chvol();
+  if (Serial) Serial.printf("[SD] provisioned CJK fonts to card: %u copied, %u failed\n", copied, failed);
+}
+
+bool SDCardManager::beginInternal() {
+  if (!ensureInternalMounted()) {
+    const esp_partition_t* part = internalPartition();
+    if (part == nullptr) {
+      if (Serial) Serial.printf("[SD] no usable internal storage partition (need > 6MB)\n");
+      return false;
+    }
+    if (!internalDevReady) {
+      if (!internalDev.begin(part)) return false;
+      internalDevReady = true;
+    }
+    // Not formatted yet: format once, then mount.
+    if (Serial) Serial.println("[SD] formatting internal storage...");
+    uint8_t* work = static_cast<uint8_t*>(malloc(4096));
+    if (work == nullptr) {
+      return false;
+    }
+    FatFormatter formatter;
+    const bool formatted = formatter.format(&internalDev, work);
+    free(work);
+    if (!formatted) {
+      if (Serial) Serial.println("[SD] internal storage format failed");
+      return false;
+    }
+    if (!internalVol.begin(&internalDev)) {
+      if (Serial) Serial.println("[SD] internal storage mount failed after format");
+      return false;
+    }
   }
   return true;
 }
@@ -230,7 +263,7 @@ void SDCardManager::migrateInternalToSd() {
     return;
   }
   // Mount the internal volume WITHOUT stealing the current working volume.
-  if (!internalVol.begin(&internalDev, false) && !internalVol.begin(&internalDev, false, 0, 0)) {
+  if (!ensureInternalMounted()) {
     // Nothing to migrate: the internal volume was never formatted (the common
     // case once a microSD is in use). Not an error — stay quiet.
     return;
