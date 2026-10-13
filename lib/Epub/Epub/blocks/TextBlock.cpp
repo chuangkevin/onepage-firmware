@@ -9,6 +9,31 @@
 
 #include "../LayoutMode.h"
 
+// Sentence punctuation and closing brackets: vertical Chinese typesetting puts
+// these at the top-right of the character cell instead of centring them.
+static bool isVerticalTopRightPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1B:  // ；
+    case 0xFF1A:  // ：
+    case 0xFF01:  // ！
+    case 0xFF1F:  // ？
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x300B:  // 》
+    case 0xFF09:  // ）
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+      return true;
+    default:
+      return false;
+  }
+}
+
 void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int x, const int y) const {
   // Focus annotations are optional: empty vectors mean no word in this block has a split.
   // When present, they must be sized in lockstep with words[].
@@ -29,7 +54,14 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
     // cannot be a rotated draw. wordXpos (placement across a line) is meaningless
     // here; the column x is the block origin and every codepoint advances one
     // line height downwards.
+    //
+    // Two typographic rules make it read properly:
+    //  - each glyph is centred across the column instead of hugging its left edge
+    //    (CJK advances are a full em, so this only matters for digits/latin);
+    //  - sentence punctuation and closing brackets move to the top-right of the
+    //    cell, which is where vertical Chinese typesetting puts them.
     const int lineHeight = renderer.getLineHeight(fontId);
+    const int quarterEm = lineHeight / 4;
     int down = 0;
     for (size_t i = 0; i < words.size(); i++) {
       const std::string& word = words[i];
@@ -41,7 +73,16 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
         const size_t take = (p + len <= word.size()) ? len : 1;
         const std::string glyph = word.substr(p, take);
         p += take;
-        renderer.drawText(fontId, x, y + down, glyph.c_str(), true, verticalStyle, baseDir);
+
+        const uint32_t cp = EpubLayout::utf8FirstCodepoint(glyph);
+        const int glyphWidth = renderer.getTextWidth(fontId, glyph.c_str(), verticalStyle, baseDir);
+        int gx = x + (lineHeight - glyphWidth) / 2;
+        int gy = y + down;
+        if (isVerticalTopRightPunctuation(cp)) {
+          gx += quarterEm;
+          gy -= quarterEm;
+        }
+        renderer.drawText(fontId, gx, gy, glyph.c_str(), true, verticalStyle, baseDir);
         down += lineHeight;
       }
     }

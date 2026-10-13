@@ -37,4 +37,17 @@ inline size_t utf8CodepointCount(const std::string& s) {
   }
   return n;
 }
+
+// First codepoint of a UTF-8 string, or 0 when empty.
+inline uint32_t utf8FirstCodepoint(const std::string& s) {
+  if (s.empty()) return 0;
+  const uint8_t lead = static_cast<uint8_t>(s[0]);
+  if ((lead & 0x80) == 0) return lead;
+  const size_t n = utf8SeqLen(lead);
+  uint32_t cp = lead & (0xFFu >> (n + 1));
+  for (size_t i = 1; i < n && i < s.size(); ++i) {
+    cp = (cp << 6) | (static_cast<uint8_t>(s[i]) & 0x3Fu);
+  }
+  return cp;
+}
 }  // namespace EpubLayout
