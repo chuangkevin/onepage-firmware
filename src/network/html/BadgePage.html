@@ -42,14 +42,57 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
 const W=480,H=800;
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 let photoImg=null;
+let photoDataUrl='';
 const logoImg=document.getElementById('logoImg');
 
-document.getElementById('photo').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{photoImg=im;render();};im.src=URL.createObjectURL(f);};
+// The device serves this page stateless, so remember the form in the browser.
+// Text fields are stored as-is; the photo is stored as a downscaled JPEG data
+// URL so it fits comfortably in localStorage.
+const LS_KEY='crosspoint.badge.form.v1';
+function saveForm(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      name:document.getElementById('name').value,
+      title:document.getElementById('title').value,
+      carrier:document.getElementById('carrier').value,
+      photo:photoDataUrl
+    }));
+  }catch(e){}
+}
+function loadForm(){
+  let d=null;
+  try{ d=JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){}
+  if(d){
+    if(d.name) document.getElementById('name').value=d.name;
+    if(d.title) document.getElementById('title').value=d.title;
+    if(d.carrier) document.getElementById('carrier').value=d.carrier;
+    if(d.photo){
+      photoDataUrl=d.photo;
+      const im=new Image(); im.onload=()=>{photoImg=im;render();}; im.src=d.photo;
+    }
+  }
+  render();
+}
+// 600px is plenty for the 360px photo slot and keeps the stored copy small.
+function shrinkToDataUrl(img){
+  const c=document.createElement('canvas');
+  const s=Math.min(1,600/Math.max(img.width,img.height));
+  c.width=Math.max(1,Math.round(img.width*s)); c.height=Math.max(1,Math.round(img.height*s));
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.72);
+}
+document.getElementById('photo').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const im=new Image();
+  im.onload=()=>{ photoImg=im; try{ photoDataUrl=shrinkToDataUrl(im); }catch(err){ photoDataUrl=''; } saveForm(); render(); };
+  im.src=URL.createObjectURL(f);
+};
 document.getElementById('render').onclick=render;
 document.getElementById('save').onclick=save;
-document.getElementById('name').oninput=render;
-document.getElementById('title').oninput=render;
-document.getElementById('carrier').oninput=render;
+document.getElementById('name').oninput=()=>{saveForm();render();};
+document.getElementById('title').oninput=()=>{saveForm();render();};
+document.getElementById('carrier').oninput=()=>{saveForm();render();};
+loadForm();
 
 // Code 39 narrow/wide encodings. Mobile barcodes use '/' followed by seven
 // uppercase alphanumeric characters; the numeric patterns are the standard
