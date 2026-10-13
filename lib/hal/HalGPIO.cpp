@@ -227,7 +227,12 @@ void HalGPIO::begin() {
   digitalWrite(EPD_RST, HIGH);
   delay(20);
   digitalWrite(EPD_RST, LOW);   // power-cycle the rail / reset the EPD
-  delay(120);
+  // Hold the rail down long enough for it to actually discharge. 120 ms was too
+  // short: the EPD+SD decoupling caps keep the panel alive through it, so a panel
+  // that had been sent CMD_DEEP_SLEEP stayed latched and the screen came up blank
+  // even across reboots. 600 ms is a real power cycle. Runs before Storage.begin()
+  // mounts the card, so the card is never browned out.
+  delay(600);
   digitalWrite(EPD_RST, HIGH);
   delay(120);                   // let the rail settle before the SD is mounted
 #endif
