@@ -7,6 +7,8 @@
 
 #include <cstring>
 
+#include "../LayoutMode.h"
+
 void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int x, const int y) const {
   // Focus annotations are optional: empty vectors mean no word in this block has a split.
   // When present, they must be sized in lockstep with words[].
@@ -21,6 +23,31 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
 
   const bool scanning = renderer.isFontCacheScanning();
   const int ascender = renderer.getFontAscenderSize(fontId);
+
+  if (EpubLayout::vertical) {
+    // Vertical CJK: the glyphs stay upright and stack down the column, so this
+    // cannot be a rotated draw. wordXpos (placement across a line) is meaningless
+    // here; the column x is the block origin and every codepoint advances one
+    // line height downwards.
+    const int lineHeight = renderer.getLineHeight(fontId);
+    int down = 0;
+    for (size_t i = 0; i < words.size(); i++) {
+      const std::string& word = words[i];
+      const EpdFontFamily::Style verticalStyle = wordStyles[i];
+      const auto baseDir = static_cast<BidiUtils::BidiBaseDir>(
+          BidiUtils::detectParagraphLevel(word.c_str(), blockStyle.isRtl ? 1 : 0));
+      for (size_t p = 0; p < word.size();) {
+        const size_t len = EpubLayout::utf8SeqLen(static_cast<uint8_t>(word[p]));
+        const size_t take = (p + len <= word.size()) ? len : 1;
+        const std::string glyph = word.substr(p, take);
+        p += take;
+        renderer.drawText(fontId, x, y + down, glyph.c_str(), true, verticalStyle, baseDir);
+        down += lineHeight;
+      }
+    }
+    return;
+  }
+
   for (size_t i = 0; i < words.size(); i++) {
     const int wordX = wordXpos[i] + x;
     const EpdFontFamily::Style currentStyle = wordStyles[i];

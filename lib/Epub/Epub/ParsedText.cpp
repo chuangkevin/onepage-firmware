@@ -12,6 +12,8 @@
 
 #include "hyphenation/Hyphenator.h"
 
+#include "LayoutMode.h"
+
 constexpr int MAX_COST = std::numeric_limits<int>::max();
 
 namespace {
@@ -448,6 +450,11 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
 }
 
 int ParsedText::resolveFirstLineIndent(const bool isFirstLine, const GfxRenderer& renderer, const int fontId) const {
+  // A first-line indent is a horizontal concept: in vertical mode it would push
+  // the top of the first column down instead of insetting a line.
+  if (EpubLayout::vertical) {
+    return 0;
+  }
   if (!isFirstLine || !isNaturalAlign) {
     return 0;
   }
@@ -537,8 +544,19 @@ std::vector<uint16_t> ParsedText::calculateWordWidths(const GfxRenderer& rendere
   std::vector<uint16_t> wordWidths;
   wordWidths.reserve(words.size());
 
+  // Vertical CJK reuses the whole line-breaking machinery by measuring each word
+  // ALONG the column instead of across it: one line height per codepoint, so a
+  // "line" turns into a column of characters that fills the page height.
+  const int lineHeight = EpubLayout::vertical ? renderer.getLineHeight(fontId) : 0;
+
   for (size_t i = 0; i < words.size(); ++i) {
-    wordWidths.push_back(measureWordWidth(renderer, fontId, words[i], wordStyles[i]));
+    if (EpubLayout::vertical) {
+      const uint32_t advance =
+          static_cast<uint32_t>(EpubLayout::utf8CodepointCount(words[i])) * static_cast<uint32_t>(lineHeight);
+      wordWidths.push_back(static_cast<uint16_t>(std::min<uint32_t>(advance, std::numeric_limits<uint16_t>::max())));
+    } else {
+      wordWidths.push_back(measureWordWidth(renderer, fontId, words[i], wordStyles[i]));
+    }
   }
 
   return wordWidths;

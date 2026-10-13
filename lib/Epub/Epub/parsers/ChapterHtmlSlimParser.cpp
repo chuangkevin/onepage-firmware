@@ -13,7 +13,19 @@
 #include <new>
 
 #include "Epub.h"
+#include "Epub/LayoutMode.h"
 #include "Epub/Page.h"
+
+// How far the line breaker should let a line run: the page width normally, or the
+// page height when the text is laid out in vertical columns.
+static uint16_t layoutExtent(const BlockStyle& style, const uint16_t viewportWidth, const uint16_t viewportHeight) {
+  if (EpubLayout::vertical) {
+    const int inset = style.topInset() + style.bottomInset();
+    return (inset < static_cast<int>(viewportHeight)) ? static_cast<uint16_t>(viewportHeight - inset) : viewportHeight;
+  }
+  const int inset = style.totalHorizontalInset();
+  return (inset < static_cast<int>(viewportWidth)) ? static_cast<uint16_t>(viewportWidth - inset) : viewportWidth;
+}
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageToFramebufferDecoder.h"
 #include "Epub/htmlEntities.h"
@@ -1114,10 +1126,8 @@ void XMLCALL ChapterHtmlSlimParser::characterData(void* userData, const XML_Char
   // Spotted when reading Intermezzo, there are some really long text blocks in there.
   if (self->currentTextBlock->size() > 750) {
     LOG_DBG("EHP", "Text block too long, splitting into multiple pages");
-    const int horizontalInset = self->currentTextBlock->getBlockStyle().totalHorizontalInset();
-    const uint16_t effectiveWidth = (horizontalInset < self->viewportWidth)
-                                        ? static_cast<uint16_t>(self->viewportWidth - horizontalInset)
-                                        : self->viewportWidth;
+    const uint16_t effectiveWidth =
+        layoutExtent(self->currentTextBlock->getBlockStyle(), self->viewportWidth, self->viewportHeight);
     self->currentTextBlock->layoutAndExtractLines(
         self->renderer, self->fontId, effectiveWidth,
         [self](const std::shared_ptr<TextBlock>& textBlock) { self->addLineToPage(textBlock); }, false);
@@ -1365,7 +1375,12 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
     currentPageNextY = 0;
   }
 
-  if (currentPageNextY + lineHeight > viewportHeight) {
+  // In vertical mode the same cursor runs ACROSS the page instead of down it: each
+  // extracted "line" is a column, columns advance from the right edge leftwards,
+  // and the page runs out of room horizontally rather than vertically.
+  const int pageExtent = EpubLayout::vertical ? viewportWidth : viewportHeight;
+
+  if (currentPageNextY + lineHeight > pageExtent) {
     completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex);
     completedPageCount++;
     currentPage.reset(new Page());
@@ -1381,9 +1396,18 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   }
   pendingFootnotes.erase(pendingFootnotes.begin(), footnoteIt);
 
-  // Apply horizontal left inset (margin + padding) as x position offset
-  const int16_t xOffset = line->getBlockStyle().leftInset();
-  currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
+  // Place the line. Horizontal: left inset, cursor down the page. Vertical: the
+  // column sits one column width in from the right edge and the cursor walks left.
+  int16_t xPos;
+  int16_t yPos;
+  if (EpubLayout::vertical) {
+    xPos = static_cast<int16_t>(viewportWidth - currentPageNextY - lineHeight);
+    yPos = 0;
+  } else {
+    xPos = line->getBlockStyle().leftInset();
+    yPos = currentPageNextY;
+  }
+  currentPage->elements.push_back(std::make_shared<PageLine>(line, xPos, yPos));
   currentPageNextY += lineHeight;
 }
 
@@ -1409,10 +1433,9 @@ void ChapterHtmlSlimParser::makePages() {
     currentPageNextY += blockStyle.paddingTop;
   }
 
-  // Calculate effective width accounting for horizontal margins/padding
-  const int horizontalInset = blockStyle.totalHorizontalInset();
-  const uint16_t effectiveWidth =
-      (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
+  // The text extent to break lines against: the width normally, the height in
+  // vertical mode, in both cases minus the block's insets on that axis.
+  const uint16_t effectiveWidth = layoutExtent(blockStyle, viewportWidth, viewportHeight);
 
   currentTextBlock->layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
