@@ -3,3 +3,7 @@
 *.log
 sdkconfig.onepage.local
 backups/**/*.bin
+
+# python bytecode
+__pycache__/
+*.pyc
