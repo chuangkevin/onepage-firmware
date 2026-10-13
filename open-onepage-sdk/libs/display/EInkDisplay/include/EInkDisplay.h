@@ -103,6 +103,11 @@ class EInkDisplay {
 
   void refreshDisplay(RefreshMode mode = FAST_REFRESH, bool turnOffScreen = false);
 
+  // Allow the wedge recovery to pulse the panel reset line. On OnePage GPIO27 is
+  // both the EPD reset and the SD power rail, so this must stay false whenever a
+  // card is mounted; main.cpp sets it from Storage.usingInternalStorage().
+  void setAllowHardwareResetOnRecovery(bool allow) { _allowHardwareReset = allow; }
+
   // Hint the X3 policy to run a one-shot full resync on next update.
   void requestResync(uint8_t settlePasses = 0);
 
@@ -146,6 +151,8 @@ class EInkDisplay {
   // the controller did not finish the waveform. refreshDisplay uses it to
   // re-arm the panel instead of leaving it wedged for the next frame.
   bool _busyTimedOut = false;
+  // Whether recoverPanel() may pulse the reset line (see the setter).
+  bool _allowHardwareReset = false;
   bool _x3RedRamSynced = false;
   struct X3GrayState {
     bool lastBaseWasPartial = false;

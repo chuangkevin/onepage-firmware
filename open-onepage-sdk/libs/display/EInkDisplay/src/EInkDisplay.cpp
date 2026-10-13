@@ -630,14 +630,15 @@ void EInkDisplay::pollBusy(const char *comment, const char *completeWord, unsign
     // dependent, which is why it looked intermittent.
     while (digitalRead(_busy) == LOW) {
       delay(1);
-      if (millis() - start > 50) break;  // no work started: treat as a no-op
+      if (millis() - start > 1000) break;  // no work started: treat as a no-op
     }
     if (digitalRead(_busy) != HIGH) {
       return;  // never asserted; skip the completion log
     }
-    // Wait for the waveform to finish. The bound stays short (5s at the call
-    // sites): a wedged BUSY line must never freeze the UI, and the measured
-    // full refresh is ~3.8s.
+    // Wait for the waveform to finish. timeoutMs is per-op: a full refresh is the
+    // longest drive and stretches further when the panel is cold, so a fixed
+    // short cap can cut a legitimate refresh short — and a refresh cut short
+    // leaves the panel mid-waveform, which is how it ends up wedged.
     while (digitalRead(_busy) == HIGH) {
       delay(1);
       if (millis() - start > timeoutMs)
@@ -1932,23 +1933,27 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   // Wait for display to finish updating
   if (Serial)
     Serial.printf("[%lu]   Waiting for display refresh...\n", millis());
-  // Keep the bound short: a wedged BUSY line must never freeze the UI. The
-  // measured full refresh here is ~3.8 s, so 5 s leaves margin without the
-  // 30 s stall the panel can otherwise impose.
-  waitWhileBusy(refreshType, 5000);
+  // Full refresh is the longest waveform and stretches further when the panel
+  // is cold; give each mode a budget that cannot cut a valid refresh short.
+  // Cutting one short leaves the panel mid-waveform, which is what wedges it.
+  const unsigned long refreshTimeoutMs =
+      (mode == FULL_REFRESH) ? 30000UL : (mode == HALF_REFRESH) ? 15000UL : 5000UL;
+  waitWhileBusy(refreshType, refreshTimeoutMs);
 
   if (_busyTimedOut) {
-    // BUSY never released, so the waveform did not finish. Re-issuing
-    // MASTER_ACTIVATION does not clear this (verified on the device: the retry
-    // also sat at exactly 5001 ms). A stuck SSD1677 only comes back after a
-    // reset, so run the full recovery and repaint, then activate once more.
+    // Even a generous budget expired and BUSY is still asserted, so the
+    // controller is wedged rather than merely slow. Re-activating does not clear
+    // it (verified: the retry also sat at the bound) and neither does
+    // CMD_SOFT_RESET (also timed out). Only a real reset recovers it, which means
+    // pulsing GPIO27 -- safe only when no SD card is mounted, because GPIO27 is
+    // also the card's power rail. recoverPanel() checks that.
     recoverPanel();
     sendCommand(CMD_WRITE_TEMP);
     sendData(0x19);
     sendCommand(CMD_DISPLAY_UPDATE_CTRL2);
     sendData(static_cast<uint8_t>(displayMode | 0xC0));
     sendCommand(CMD_MASTER_ACTIVATION);
-    waitWhileBusy(refreshType, 5000);
+    waitWhileBusy(refreshType, refreshTimeoutMs);
     if (_busyTimedOut && Serial)
       Serial.printf("[%lu]   panel still busy after reset\n", millis());
     else if (Serial)
@@ -1964,8 +1969,24 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
 // intended image rather than whatever the reset left in RAM.
 void EInkDisplay::recoverPanel() {
   if (Serial)
-    Serial.printf("[%lu]   panel wedged (BUSY never released); soft-resetting controller\n", millis());
+    Serial.printf("[%lu]   panel wedged (BUSY never released); recovering\n", millis());
   _busyTimedOut = false;
+
+  // A wedged SSD1677 only comes back after a real reset: CMD_SOFT_RESET alone
+  // also times out (verified on hardware). Pulsing _rst does that, but on OnePage
+  // GPIO27 is also the SD power rail, so it is only allowed when no card is
+  // mounted (main.cpp sets _allowHardwareReset from Storage.usingInternalStorage()).
+  if (_allowHardwareReset) {
+    if (Serial)
+      Serial.printf("[%lu]   no SD mounted; pulsing panel reset\n", millis());
+    pinMode(_rst, OUTPUT);
+    digitalWrite(_rst, LOW);
+    delay(20);
+    digitalWrite(_rst, HIGH);
+    delay(60);
+  } else if (Serial) {
+    Serial.printf("[%lu]   SD mounted; hardware reset withheld, software re-init only\n", millis());
+  }
 
   initDisplayController();
 
