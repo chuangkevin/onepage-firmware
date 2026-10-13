@@ -248,6 +248,17 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, bool fullRefre
 
   const auto finalMode = fullRefresh ? HalDisplay::FULL_REFRESH : HalDisplay::HALF_REFRESH;
 
+#ifdef DIAG_NAMEPLATE_FRAME
+  uint32_t frameHash = 2166136261u;
+  const auto* frame = renderer.getFrameBuffer();
+  for (size_t i = 0; i < renderer.getBufferSize(); ++i) {
+    frameHash = (frameHash ^ frame[i]) * 16777619u;
+  }
+  LOG_INF("SLP", "FRAME bytes=%u fnv=%08lx orientation=%u bpp=%u",
+          static_cast<unsigned>(renderer.getBufferSize()), static_cast<unsigned long>(frameHash),
+          static_cast<unsigned>(renderer.getOrientation()), static_cast<unsigned>(bitmap.getBpp()));
+#endif
+
   if (hasGreyscale) {
     // OEM grayscale pipeline base: on X3 this displays the frame with the
     // dedicated "AA-pre-BW(mid)" differential waveform, leaving every pixel

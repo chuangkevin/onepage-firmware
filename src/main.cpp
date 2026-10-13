@@ -371,27 +371,44 @@ void setup() {
   HalSystem::checkPanic();
 
 #ifdef DUMP_FILE_ON_BOOT
-  // Diagnostic: stream a file out of the raw USB serial port so it can be
-  // captured on the host without a card reader. Slow, chunked writes with an
-  // explicit WDT kick — a bulk write trips the watchdog and resets the board.
+  // Diagnostic only: numbered hex records make short USB writes detectable.
+  // The receiver must verify length, offsets and FNV-1a before using the file.
   for (const char* dumpPath : {DUMP_FILE_ON_BOOT}) {
     HalFile df;
     if (Storage.openFileForRead("DUMP", dumpPath, df)) {
       const size_t n = df.fileSize();
-      logSerial.printf("\n@@DUMP_BEGIN %s %u@@\n", dumpPath, static_cast<unsigned>(n));
-      logSerial.flush();
-      uint8_t dbuf[512];
+      const auto sendRecord = [](const char* text, size_t length) {
+        size_t sent = 0;
+        const unsigned long start = millis();
+        while (sent < length && millis() - start < 1000) {
+          sent += logSerial.write(reinterpret_cast<const uint8_t*>(text) + sent, length - sent);
+          delay(1);
+        }
+        return sent == length;
+      };
+      char record[192];
+      int length = snprintf(record, sizeof(record), "\n@@BADGE_BEGIN %u@@\n", static_cast<unsigned>(n));
+      bool ok = n <= 65536 && sendRecord(record, length);
+      uint8_t dbuf[64];
       size_t total = 0;
-      int r;
-      while ((r = df.read(dbuf, sizeof(dbuf))) > 0) {
-        logSerial.write(dbuf, static_cast<size_t>(r));
-        logSerial.flush();
-        total += static_cast<size_t>(r);
-        esp_task_wdt_reset();
-        delay(3);
+      uint32_t hash = 2166136261u;
+      const unsigned long started = millis();
+      while (ok && total < n && millis() - started < 30000) {
+        const int r = df.read(dbuf, std::min(sizeof(dbuf), n - total));
+        if (r <= 0) { ok = false; break; }
+        length = snprintf(record, sizeof(record), "@@BADGE_DATA %u ", static_cast<unsigned>(total));
+        for (int i = 0; i < r; ++i) {
+          length += snprintf(record + length, sizeof(record) - length, "%02x", dbuf[i]);
+          hash = (hash ^ dbuf[i]) * 16777619u;
+        }
+        length += snprintf(record + length, sizeof(record) - length, "@@\n");
+        ok = sendRecord(record, length);
+        total += r;
       }
-      logSerial.printf("\n@@DUMP_END %u@@\n", static_cast<unsigned>(total));
-      logSerial.flush();
+      length = snprintf(record, sizeof(record), "@@BADGE_END %u %08lx %s@@\n",
+                        static_cast<unsigned>(total), static_cast<unsigned long>(hash),
+                        ok && total == n ? "OK" : "FAIL");
+      sendRecord(record, length);
       df.close();
     } else {
       logSerial.printf("\n@@DUMP_MISSING %s@@\n", dumpPath);

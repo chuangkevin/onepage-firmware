@@ -106,7 +106,10 @@ function render(){
     status.textContent='條碼預覽：'+carrier;
     drawCode39(carrier,30,660,W-60,54);
     ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.font='20px monospace'; ctx.fillText(carrier,W/2,752);
+    ctx.font='20px monospace';
+    ctx.lineWidth=2; ctx.strokeStyle='#000'; ctx.lineJoin='round';
+    ctx.strokeText(carrier,W/2,752);
+    ctx.fillText(carrier,W/2,752);
   }
 
   // Final pass: force every remaining colour to pure black/white by luminance.
@@ -152,6 +155,13 @@ function drawCover(img,x,y,w,h,r){
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function drawFit(text,x,y,maxW,maxH,weight){
   let size=maxH; do{ctx.font=weight+' '+size+'px "PingFang TC","Noto Sans TC",sans-serif'; if(ctx.measureText(text).width<=maxW)break; size-=2;}while(size>12);
+  // Fatten the strokes: on this 1-bit panel thin black-on-white glyph strokes
+  // render mottled, so outline the glyph as well as filling it (adds ~2px of
+  // weight at these sizes). Kept before the final threshold pass.
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.lineWidth=Math.max(2,Math.round(size*0.05));
+  ctx.strokeStyle=ctx.fillStyle;
+  ctx.strokeText(text,x,y);
   ctx.fillText(text,x,y);
 }
 

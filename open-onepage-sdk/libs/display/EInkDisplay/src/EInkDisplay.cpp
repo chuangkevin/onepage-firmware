@@ -1900,9 +1900,12 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   if (mode == FULL_REFRESH) {
     displayMode |= 0x34;
   } else if (mode == HALF_REFRESH) {
-    // Write high temp to the register for a faster refresh
-    sendCommand(CMD_WRITE_TEMP);
-    sendData(0x5A);
+    // Do NOT fake the temperature here. This used to write 0x5A (~90 C) "for a
+    // faster refresh", but the register then stayed at that value: a later FULL
+    // refresh loads it (TEMP_LOAD) and drives with a far too short waveform, so
+    // the image came out under-driven (thin strokes mottled, whole panel could
+    // garble). The controller is configured for its internal sensor at init;
+    // leave the temperature alone and let it use the real value.
     displayMode |= 0xD4;
   } else { // FAST_REFRESH
     displayMode |= customLutActive ? 0x0C : 0x1C;
