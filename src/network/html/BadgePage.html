@@ -35,6 +35,8 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
       <option value="badge">工牌（同事版：黑底標題列＋大名字＋QR）</option>
     </select></label>
     <div id="badgeOnly" style="display:none">
+      <label>標題列主字（不填＝用 logo） <input type="text" id="headMain" maxlength="14" placeholder="例：KEVIN" spellcheck="false"></label>
+      <label>標題列副字（小字、字距拉開） <input type="text" id="headSub" maxlength="30" placeholder="例：INTERAGENT 授權人員" spellcheck="false"></label>
       <label>員工編號 <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
       <label>部門／標語 <input type="text" id="division" maxlength="40" placeholder="SCIENCE &amp; TECHNOLOGY DIVISION" spellcheck="false"></label>
       <label>權限等級 <input type="text" id="clearance" maxlength="6" placeholder="7" spellcheck="false"></label>
@@ -2378,6 +2380,8 @@ function saveForm(){
       title:document.getElementById('title').value,
       layout:document.getElementById('layout').value,
       showPhoto:document.getElementById('showPhoto').checked,
+      headMain:document.getElementById('headMain').value,
+      headSub:document.getElementById('headSub').value,
       agentId:document.getElementById('agentId').value,
       division:document.getElementById('division').value,
       clearance:document.getElementById('clearance').value,
@@ -2396,6 +2400,8 @@ function loadForm(){
     if(d.title) document.getElementById('title').value=d.title;
     if(d.layout){ document.getElementById('layout').value=d.layout; syncLayoutFields(); }
     if(d.showPhoto!==undefined) document.getElementById('showPhoto').checked=!!d.showPhoto;
+    if(d.headMain) document.getElementById('headMain').value=d.headMain;
+    if(d.headSub) document.getElementById('headSub').value=d.headSub;
     if(d.agentId) document.getElementById('agentId').value=d.agentId;
     if(d.division) document.getElementById('division').value=d.division;
     if(d.clearance) document.getElementById('clearance').value=d.clearance;
@@ -2432,7 +2438,7 @@ document.getElementById('codeValue').oninput=()=>{saveForm();render();};
 document.getElementById('ditherCell').onchange=()=>{saveForm();render();};
 document.getElementById('layout').onchange=()=>{saveForm();syncLayoutFields();render();};
 document.getElementById('showPhoto').onchange=()=>{saveForm();render();};
-for(const id of ['agentId','division','clearance']) document.getElementById(id).oninput=()=>{saveForm();render();};
+for(const id of ['headMain','headSub','agentId','division','clearance']) document.getElementById(id).oninput=()=>{saveForm();render();};
 function syncLayoutFields(){document.getElementById('badgeOnly').style.display=document.getElementById('layout').value==='badge'?'block':'none';}
 
 // Code 39 narrow/wide encodings. Mobile barcodes use '/' followed by seven
@@ -2551,16 +2557,19 @@ function drawCover(img,x,y,w,h,r){
   ctx.save(); roundRect(x,y,w,h,r); ctx.clip(); ctx.drawImage(img,dx,dy,dw,dh); ctx.restore();
 }
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
-function drawFit(text,x,y,maxW,maxH,weight){
+function drawFit(text,x,y,maxW,maxH,weight,mode){
   let size=maxH; do{ctx.font=weight+' '+size+'px "PingFang TC","Noto Sans TC",sans-serif'; if(ctx.measureText(text).width<=maxW)break; size-=2;}while(size>12);
   // Fatten the strokes: on this 1-bit panel thin black-on-white glyph strokes
   // render mottled, so outline the glyph as well as filling it (adds ~2px of
   // weight at these sizes). Kept before the final threshold pass.
+  const prevAlign=ctx.textAlign;
+  if(mode) ctx.textAlign=mode;
   ctx.lineJoin='round'; ctx.lineCap='round';
   ctx.lineWidth=Math.max(2,Math.round(size*0.05));
   ctx.strokeStyle=ctx.fillStyle;
   ctx.strokeText(text,x,y);
   ctx.fillText(text,x,y);
+  ctx.textAlign=prevAlign;
 }
 
 // Force one rectangle to pure black/white by luminance (no error diffusion).
@@ -2637,124 +2646,112 @@ function ditherRegion(rx,ry,rw,rh,cell){
 // cleanly (a dithered photo is the only element that cannot).
 // ===========================================================================
 function renderBadgeLayout(){
-  const name=(document.getElementById('name').value||'').trim();
-  const title=(document.getElementById('title').value||'').trim();
-  const agentId=(document.getElementById('agentId').value||'').trim();
-  const division=(document.getElementById('division').value||'').trim();
-  const clearance=(document.getElementById('clearance').value||'').trim();
-  const codeType=document.getElementById('codeType').value;
-  const codeValue=(document.getElementById('codeValue').value||'').trim();
-  const ditherCell=parseInt(document.getElementById('ditherCell').value||'1',10);
-  const status=document.getElementById('carrierStatus');
+  const g=id=>document.getElementById(id);
+  const name=(g('name').value||'').trim();
+  const title=(g('title').value||'').trim();
+  const agentId=(g('agentId').value||'').trim();
+  const division=(g('division').value||'').trim();
+  const clearance=(g('clearance').value||'').trim();
+  const codeType=g('codeType').value;
+  const codeValue=(g('codeValue').value||'').trim();
+  const showPhoto=g('showPhoto').checked;
+  const status=g('carrierStatus');
+  const CJK='"PingFang TC","Noto Sans TC",sans-serif';
 
-  const M=28;                       // side margin, as the reference uses
-  let y=0;
+  // Every coordinate below was measured off the reference badge BMP the
+  // customer supplied, so this reproduces that layout rather than approximating
+  // it. Content box is x 28..452 (M = 28) throughout.
+  const M=28, RW=W-2*M;
 
-  // --- black title band -------------------------------------------------
-  const HEAD=150;
-  ctx.fillStyle='#000'; ctx.fillRect(0,y,W,HEAD);
-  if(logoImg.complete&&logoImg.naturalWidth){
-    const lh=64, lw=Math.round(logoImg.naturalWidth*lh/logoImg.naturalHeight);
-    const ly=y+30;
+  // --- black title band, y 0..149 ---------------------------------------
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,150);
+  const headMain=(g('headMain').value||'').trim();
+  const headSub=(g('headSub').value||'').trim();
+  if(headMain){
+    // Own header: large left-aligned wordmark of the user's choosing, so the
+    // layout borrows the reference's structure without copying its identity.
+    ctx.fillStyle='#fff';
+    drawFit(headMain, M, 108, RW, 64, '700', 'left');
+  }else if(logoImg.complete&&logoImg.naturalWidth){
+    // Reference holds a ~292x68 reversed-out wordmark at x 28, y 29. Clamp the
+    // width so a wider logo cannot run past the content box (it did before).
+    let lh=68, lw=Math.round(logoImg.naturalWidth*lh/logoImg.naturalHeight);
+    if(lw>300){ lw=300; lh=Math.round(logoImg.naturalHeight*lw/logoImg.naturalWidth); }
+    const ly=29+Math.round((68-lh)/2);
     ctx.drawImage(logoImg,M,ly,lw,lh);
-    reverseInPlace(M,ly,lw,lh);      // black mark -> white on the black band
+    reverseInPlace(M,ly,lw,lh);
   }
   ctx.fillStyle='#fff';
-  ctx.font='700 12px "PingFang TC","Noto Sans TC",sans-serif';
-  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  ctx.fillText('授權人員專用', M, y+HEAD-18);
-  y+=HEAD;
+  ctx.font='700 12px '+CJK; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  drawTracked(headSub||'授權人員專用', M, 138, 2, 'left');
 
-  // --- meta row + rule --------------------------------------------------
+  // --- meta row (text 164..175) + rule at y 190 -------------------------
   ctx.fillStyle='#000';
-  ctx.font='700 14px "PingFang TC","Noto Sans TC",sans-serif';
-  ctx.textAlign='left';
-  if(agentId) ctx.fillText('員工編號  '+agentId, M, y+26);
-  ctx.textAlign='right';
-  ctx.fillText('ACTIVE', W-M, y+26);
-  ctx.fillRect(M, y+42, W-2*M, 2);
-  y+=44;
+  ctx.font='700 14px '+CJK; ctx.textAlign='left';
+  if(agentId) ctx.fillText('員工編號  '+agentId, M, 175);
+  ctx.textAlign='right'; ctx.fillText('ACTIVE', W-M, 175);
+  ctx.fillRect(M,190,RW,2);
 
-  // --- photo (optional; the reference has none) -------------------------
-  if(photoImg && document.getElementById('showPhoto').checked){
-    const ph=190, pw=W-2*M;
-    drawCover(photoImg,M,y+12,pw,ph,10);
-    ditherRegion(M,y+12,pw,ph,ditherCell);
-    y+=ph+20;
-  }
-
-  // --- name / title / division -----------------------------------------
-  ctx.fillStyle='#000';
-  ctx.textAlign='center';
-  const nameBase = y+96;
-  drawFit(name||' ', W/2, nameBase, W-2*M, 96, '700');
-  ctx.fillStyle='#000';
-  drawFit(title||' ', W/2, nameBase+52, W-2*M, 34, '500');
+  // --- name (209..337) / title (368..393) / division (413..421) ---------
+  ctx.fillStyle='#000'; ctx.textAlign='center';
+  drawFit(name||' ', W/2, 337, RW, 128, '700');
+  ctx.fillStyle='#000'; ctx.textAlign='center';
+  drawFit(title||' ', W/2, 393, RW, 30, '400');
   if(division){
-    const prev=ctx.fillStyle;
-    ctx.font='500 13px "PingFang TC","Noto Sans TC",sans-serif';
-    ctx.textAlign='center';
-    drawTracked(division, W/2, nameBase+80, 4);
-    ctx.fillStyle=prev;
+    ctx.fillStyle='#000'; ctx.font='500 12px '+CJK;
+    ctx.textAlign='center'; drawTracked(division, W/2, 421, 4.5, 'center');
   }
-  y=nameBase+96;
 
-  // --- clearance row ----------------------------------------------------
+  // --- clearance row: rule 443, chip x 324..452 y 456..496, rule 507 ----
   ctx.fillStyle='#000';
-  ctx.fillRect(M, y, W-2*M, 2);
-  const chipW=130, chipY=y+16, chipH=38;
-  ctx.font='700 14px "PingFang TC","Noto Sans TC",sans-serif';
-  ctx.textAlign='left';
-  ctx.fillText('權限等級', M, chipY+26);
-  if(clearance){
-    ctx.fillRect(W-M-chipW, chipY, chipW, chipH);
-    ctx.fillStyle='#fff';
-    ctx.font='700 20px "PingFang TC","Noto Sans TC",sans-serif';
-    ctx.textAlign='center';
-    ctx.fillText(clearance, W-M-chipW/2, chipY+27);
-    ctx.fillStyle='#000';
-  }
-  y=chipY+chipH+16;
-  ctx.fillRect(M, y, W-2*M, 2);
-  y+=18;
+  ctx.fillRect(M,443,RW,2);
+  ctx.font='700 14px '+CJK; ctx.textAlign='left';
+  ctx.fillText('等級', M, 481);
+  const chipW=128, chipX=W-M-chipW, chipY=456, chipH=40;
+  ctx.fillRect(chipX,chipY,chipW,chipH);
+  ctx.fillStyle='#fff'; ctx.font='700 20px '+CJK; ctx.textAlign='center';
+  ctx.fillText(clearance?('LEVEL '+clearance):'LEVEL', chipX+chipW/2, chipY+27);
+  ctx.fillStyle='#000';
+  ctx.fillRect(M,507,RW,2);
 
-  // --- machine-readable code -------------------------------------------
-  const bandH = (codeType==='qr') ? 186 : 118;
-  if(codeType==='none'||!codeValue){
+  // --- bottom band, x 129..350 y 523..744 (the reference bracket box) ---
+  const bx=129, by=523, bs=222;
+  if(showPhoto && photoImg){
+    drawCover(photoImg, bx, by, bs, bs, 10);
+    ditherRegion(bx, by, bs, bs, parseInt(g('ditherCell').value||'2',10));
+    status.textContent='照片顯示中（取代條碼區）。';
+  }else if(codeType==='none'||!codeValue){
     status.textContent = codeType==='none' ? '不顯示條碼。' : '填入內容才會顯示條碼／QR Code。';
-    y+=bandH;
   }else if(codeType==='barcode'){
     const v=codeValue.toUpperCase();
     if(!/^\/[A-Z0-9]{7}$/.test(v) && !/^[0-9A-Z.\- $/+%]+$/.test(v)){
       status.textContent='一維碼只支援 0-9 A-Z 與 - . 空白 $ / + %，例如 /SM6OLEQ。';
-      y+=bandH;
     }else{
       status.textContent='一維碼預覽：'+v;
-      drawCode39(v, M, y, W-2*M, bandH);
-      y+=bandH;
+      drawCode39(v, bx+6, by+40, bs-12, 150);
     }
   }else{
     status.textContent='QR Code 預覽：'+codeValue;
-    const size=bandH, x=(W-size)/2;
-    drawQr(codeValue, x, y, size);
-    drawQrBrackets(x, y, size);      // corner brackets, as the reference has
-    y+=bandH;
+    drawQr(codeValue, bx+11, by+11, bs-22);
+    drawQrBrackets(bx, by, bs);
   }
 
-  // --- url / payload caption -------------------------------------------
-  if(codeValue){
-    ctx.fillStyle='#000';
-    ctx.font='700 13px "PingFang TC","Noto Sans TC",sans-serif';
-    ctx.textAlign='center';
-    ctx.fillText(codeValue, W/2, y+16);
-    y+=26;
+  // --- payload caption (752..765) and hatched footer (784..799) ---------
+  if(codeValue && !(showPhoto&&photoImg)){
+    ctx.fillStyle='#000'; ctx.font='700 13px '+CJK; ctx.textAlign='center';
+    ctx.fillText(codeValue, W/2, 763);
   }
-
-  // --- hatched footer ---------------------------------------------------
-  hatchFooter(W,y2(W,H));
+  const FOOT=16, top=H-FOOT, step=10;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,top,W,FOOT);
+  ctx.fillStyle='#000';
+  for(let x=-FOOT;x<W+FOOT;x+=step*2){
+    ctx.beginPath();
+    ctx.moveTo(x,top); ctx.lineTo(x+step,top);
+    ctx.lineTo(x+step-FOOT,top+FOOT); ctx.lineTo(x-FOOT,top+FOOT);
+    ctx.closePath(); ctx.fill();
+  }
   solidifyRegion(0,0,W,H,200);
 }
-function y2(){ return H; }
 
 // Reverse the pixels of one rectangle in place: dark -> white, everything else
 // -> black. Used to draw the logo reversed out of the black title band, which
@@ -2774,15 +2771,16 @@ function reverseInPlace(rx,ry,rw,rh){
   ctx.putImageData(img,x0,y0);
 }
 
-// Centre-draw text with extra letter spacing (the reference's letter-spacing).
-function drawTracked(text,cx,baseY,spacing){
+// Draw text with extra tracking (the reference's letter-spacing). mode 'center'
+// centres on cx, 'left' starts at cx.
+function drawTracked(text,cx,baseY,spacing,mode){
   let w=0;
   for(const ch of text) w+=ctx.measureText(ch).width+spacing;
   w-=spacing;
-  let x=cx-w/2;
-  const prevAlign=ctx.textAlign; ctx.textAlign='left';
+  let x = (mode==='left') ? cx : cx-w/2;
+  const prev=ctx.textAlign; ctx.textAlign='left';
   for(const ch of text){ ctx.fillText(ch,x,baseY); x+=ctx.measureText(ch).width+spacing; }
-  ctx.textAlign=prevAlign;
+  ctx.textAlign=prev;
 }
 
 // Four corner brackets around the QR, as the reference draws them.
