@@ -180,8 +180,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_LYRA, StrId::STR_THEME_LYRA_EXTENDED,
                            StrId::STR_THEME_ROUNDEDRAFF},
                           "uiTheme", StrId::STR_CAT_DISPLAY),
-        SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
-                            StrId::STR_CAT_DISPLAY),
+        // "Sunlight fading fix" is intentionally not exposed: this firmware's
+        // GfxRenderer was written against an SDK that had a fadingFix parameter,
+        // but this SDK's displayBuffer/displayGrayscaleBase/displayGrayBuffer
+        // take turnOffScreen instead. Toggling it only powered the panel down
+        // after every frame. Left in CrossPointSettings for settings-file
+        // compatibility, but no longer surfaced.
         // (UI font family + size is inserted dynamically in getSettingsList()
         //  as a single picker; see buildUiFontSetting().)
 

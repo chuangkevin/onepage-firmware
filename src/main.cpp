@@ -369,6 +369,31 @@ void setup() {
 
   HalSystem::checkPanic();
 
+#ifdef DUMP_FILE_ON_BOOT
+  // Diagnostic: stream files out of the raw USB serial port so they can be
+  // captured on the host without a card reader. Enabled only for debug builds.
+  // Uses logSerial (the raw HWCDC) because the `Serial` wrapper's impl is a
+  // logging sink that is not linked into this translation unit.
+  for (const char* dumpPath : {DUMP_FILE_ON_BOOT, "/.crosspoint/settings.json"}) {
+    HalFile df;
+    if (Storage.openFileForRead("DUMP", dumpPath, df)) {
+      const size_t n = df.fileSize();
+      logSerial.printf("\n@@DUMP_BEGIN %s %u@@\n", dumpPath, static_cast<unsigned>(n));
+      uint8_t dbuf[512];
+      size_t total = 0;
+      int r;
+      while ((r = df.read(dbuf, sizeof(dbuf))) > 0) {
+        logSerial.write(dbuf, static_cast<size_t>(r));
+        total += static_cast<size_t>(r);
+      }
+      logSerial.printf("\n@@DUMP_END %u@@\n", static_cast<unsigned>(total));
+      df.close();
+    } else {
+      logSerial.printf("\n@@DUMP_MISSING %s@@\n", dumpPath);
+    }
+  }
+#endif
+
   SETTINGS.loadFromFile();
 #ifdef ONEPAGE_C61
   // OnePage bringup: force front buttons to a 1:1 layout (physical BACK/CONFIRM/
