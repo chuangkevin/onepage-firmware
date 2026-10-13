@@ -418,18 +418,28 @@ void setup() {
 
   const bool settingsLoaded = SETTINGS.loadFromFile();
 #ifdef ONEPAGE_C61
+  bool settingsNeedSave = false;
   // A malformed settings.json (seen in the field: a key mangled into
-  // `dering":0`, missing its opening quote) makes deserializeJson fail, so
+  // `dering\":0`, missing its opening quote) makes deserializeJson fail, so
   // loadFromFile returns false and EVERY boot silently falls back to defaults —
   // which is why the sleep-screen/nameplate choice never stuck. Rewrite a valid
   // file, pinned to the settings this fleet standardises on.
   if (!settingsLoaded) {
     SETTINGS.language = static_cast<uint8_t>(Language::ZH_HANT);
-    SETTINGS.sleepTimeoutMinutes = 30;
     snprintf(SETTINGS.uiFontFamilyName, sizeof(SETTINGS.uiFontFamilyName), "%s", "PingFangTC");
     snprintf(SETTINGS.sdFontFamilyName, sizeof(SETTINGS.sdFontFamilyName), "%s", "PingFangTC");
     SETTINGS.uiFontSize = 12;
+    settingsNeedSave = true;
     LOG_INF("MAIN", "settings unreadable or absent; wrote a fresh file (zh-Hant, PingFangTC)");
+  }
+  // Never auto-sleep. While asleep the panel keeps its last frame and USB drops,
+  // which is indistinguishable from a hang when you walk up to the device.
+  // Sleeping is still available on demand from the power button.
+  if (SETTINGS.sleepTimeoutMinutes < CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES) {
+    SETTINGS.sleepTimeoutMinutes = CrossPointSettings::SLEEP_TIMEOUT_NEVER_MINUTES;
+    settingsNeedSave = true;
+  }
+  if (settingsNeedSave) {
     SETTINGS.saveToFile();
   }
   // OnePage bringup: force front buttons to a 1:1 layout (physical BACK/CONFIRM/
