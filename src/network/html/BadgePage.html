@@ -2696,22 +2696,29 @@ function renderBadgeLayout(){
   // --- name (209..337) / title (368..393) / division (413..421) ---------
   ctx.fillStyle='#000'; ctx.textAlign='center';
   drawFit(name||' ', W/2, 337, RW, 112, '600');
-  ctx.fillStyle='#000'; ctx.textAlign='center';
-  drawFit(title||' ', W/2, 393, RW, 30, '400');
+  // The job title lives in the black chip lower down, not here, so a long title
+  // cannot fight the name for width.
   if(division){
     ctx.fillStyle='#000'; ctx.font='500 12px '+CJK;
-    ctx.textAlign='center'; drawTracked(division, W/2, 421, 4.5, 'center');
+    ctx.textAlign='center'; drawTracked(division, W/2, 393, 4.5, 'center');
   }
 
   // --- clearance row: rule 443, chip x 324..452 y 456..496, rule 507 ----
   ctx.fillStyle='#000';
   ctx.fillRect(M,443,RW,2);
-  ctx.font='700 14px '+CJK; ctx.textAlign='left';
-  ctx.fillText('等級', M, 481);
-  const chipW=128, chipX=W-M-chipW, chipY=456, chipH=40;
+  ctx.font='600 14px '+CJK; ctx.textAlign='left';
+  ctx.fillText('職稱', M, 481);
+  // Black chip on the right, sized to the title so it always ends flush with the
+  // content box, exactly where the reference puts its LEVEL badge.
+  const chipY=456, chipH=40;
+  let chipFont=18;
+  const chipText=title||'—';
+  do{ ctx.font='600 '+chipFont+'px '+CJK; if(ctx.measureText(chipText).width<=RW-150)break; chipFont-=1; }while(chipFont>10);
+  const chipW=Math.max(128, Math.min(RW-120, Math.ceil(ctx.measureText(chipText).width)+28));
+  const chipX=W-M-chipW;
   ctx.fillRect(chipX,chipY,chipW,chipH);
-  ctx.fillStyle='#fff'; ctx.font='600 20px '+CJK; ctx.textAlign='center';
-  ctx.fillText(clearance?('LEVEL '+clearance):'LEVEL', chipX+chipW/2, chipY+27);
+  ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(chipText, chipX+chipW/2, chipY+27);
   ctx.fillStyle='#000';
   ctx.fillRect(M,507,RW,2);
 
