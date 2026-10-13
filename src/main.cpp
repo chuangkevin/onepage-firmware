@@ -426,11 +426,23 @@ void setup() {
   // file, pinned to the settings this fleet standardises on.
   if (!settingsLoaded) {
     SETTINGS.language = static_cast<uint8_t>(Language::ZH_HANT);
-    snprintf(SETTINGS.uiFontFamilyName, sizeof(SETTINGS.uiFontFamilyName), "%s", "PingFangTC");
-    snprintf(SETTINGS.sdFontFamilyName, sizeof(SETTINGS.sdFontFamilyName), "%s", "PingFangTC");
-    SETTINGS.uiFontSize = 12;
     settingsNeedSave = true;
     LOG_INF("MAIN", "settings unreadable or absent; wrote a fresh file (zh-Hant, PingFangTC)");
+  }
+  // Pin the interface font to the Apple CJK face. If the field is empty the UI
+  // silently falls back to the built-in LXGW candidate list, which is what made
+  // the font appear to change on its own.
+  if (strcmp(SETTINGS.uiFontFamilyName, "PingFangTC") != 0) {
+    snprintf(SETTINGS.uiFontFamilyName, sizeof(SETTINGS.uiFontFamilyName), "%s", "PingFangTC");
+    settingsNeedSave = true;
+  }
+  if (strcmp(SETTINGS.sdFontFamilyName, "PingFangTC") != 0) {
+    snprintf(SETTINGS.sdFontFamilyName, sizeof(SETTINGS.sdFontFamilyName), "%s", "PingFangTC");
+    settingsNeedSave = true;
+  }
+  if (SETTINGS.uiFontSize != 12) {
+    SETTINGS.uiFontSize = 12;
+    settingsNeedSave = true;
   }
   // Never auto-sleep. While asleep the panel keeps its last frame and USB drops,
   // which is indistinguishable from a hang when you walk up to the device.
