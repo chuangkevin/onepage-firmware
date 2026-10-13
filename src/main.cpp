@@ -15,6 +15,7 @@
 #include <SPI.h>
 #include <WiFi.h>
 #include <builtinFonts/all.h>
+#include <esp_task_wdt.h>
 
 #include <cstring>
 
@@ -370,23 +371,27 @@ void setup() {
   HalSystem::checkPanic();
 
 #ifdef DUMP_FILE_ON_BOOT
-  // Diagnostic: stream files out of the raw USB serial port so they can be
-  // captured on the host without a card reader. Enabled only for debug builds.
-  // Uses logSerial (the raw HWCDC) because the `Serial` wrapper's impl is a
-  // logging sink that is not linked into this translation unit.
-  for (const char* dumpPath : {DUMP_FILE_ON_BOOT, "/.crosspoint/settings.json"}) {
+  // Diagnostic: stream a file out of the raw USB serial port so it can be
+  // captured on the host without a card reader. Slow, chunked writes with an
+  // explicit WDT kick — a bulk write trips the watchdog and resets the board.
+  for (const char* dumpPath : {DUMP_FILE_ON_BOOT}) {
     HalFile df;
     if (Storage.openFileForRead("DUMP", dumpPath, df)) {
       const size_t n = df.fileSize();
       logSerial.printf("\n@@DUMP_BEGIN %s %u@@\n", dumpPath, static_cast<unsigned>(n));
+      logSerial.flush();
       uint8_t dbuf[512];
       size_t total = 0;
       int r;
       while ((r = df.read(dbuf, sizeof(dbuf))) > 0) {
         logSerial.write(dbuf, static_cast<size_t>(r));
+        logSerial.flush();
         total += static_cast<size_t>(r);
+        esp_task_wdt_reset();
+        delay(3);
       }
       logSerial.printf("\n@@DUMP_END %u@@\n", static_cast<unsigned>(total));
+      logSerial.flush();
       df.close();
     } else {
       logSerial.printf("\n@@DUMP_MISSING %s@@\n", dumpPath);

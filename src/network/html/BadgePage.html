@@ -84,7 +84,6 @@ function render(){
     const lw=300, lh=Math.round(logoImg.naturalHeight*lw/logoImg.naturalWidth);
     const lx=(W-lw)/2, ly=40;
     ctx.drawImage(logoImg,lx,ly,lw,lh);
-    solidifyRegion(lx,ly,lw,lh,200);
   }
 
   // --- name / title — solid ---
@@ -109,6 +108,13 @@ function render(){
     ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
     ctx.font='20px monospace'; ctx.fillText(carrier,W/2,752);
   }
+
+  // Final pass: force every remaining colour to pure black/white by luminance.
+  // Text and the logo come out of the canvas ANTI-ALIASED, and makeBmp() only
+  // compares the red channel against 128, so grey stroke edges were being cut
+  // to a ragged half-covered pattern — the "chipped paint" look. The photo is
+  // already dithered to pure 0/255, so this leaves it untouched.
+  solidifyRegion(0,0,W,H,200);
 }
 
 function drawCode39(value,x,y,maxWidth,height){
