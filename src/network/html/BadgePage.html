@@ -2559,15 +2559,16 @@ function drawCover(img,x,y,w,h,r){
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function drawFit(text,x,y,maxW,maxH,weight,mode){
   let size=maxH; do{ctx.font=weight+' '+size+'px "PingFang TC","Noto Sans TC",sans-serif'; if(ctx.measureText(text).width<=maxW)break; size-=2;}while(size>12);
-  // Fatten the strokes: on this 1-bit panel thin black-on-white glyph strokes
-  // render mottled, so outline the glyph as well as filling it (adds ~2px of
-  // weight at these sizes). Kept before the final threshold pass.
   const prevAlign=ctx.textAlign;
   if(mode) ctx.textAlign=mode;
-  ctx.lineJoin='round'; ctx.lineCap='round';
-  ctx.lineWidth=Math.max(2,Math.round(size*0.05));
-  ctx.strokeStyle=ctx.fillStyle;
-  ctx.strokeText(text,x,y);
+  // Only a hairline stroke, and only at small sizes where a 1px stem can drop
+  // out. No fattening at display sizes: outlining a CJK glyph bloats it into a
+  // blob, and the reference badge proves thin strokes reproduce fine here.
+  if(size<20){
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.lineWidth=1; ctx.strokeStyle=ctx.fillStyle;
+    ctx.strokeText(text,x,y);
+  }
   ctx.fillText(text,x,y);
   ctx.textAlign=prevAlign;
 }
@@ -2694,7 +2695,7 @@ function renderBadgeLayout(){
 
   // --- name (209..337) / title (368..393) / division (413..421) ---------
   ctx.fillStyle='#000'; ctx.textAlign='center';
-  drawFit(name||' ', W/2, 337, RW, 128, '700');
+  drawFit(name||' ', W/2, 337, RW, 112, '600');
   ctx.fillStyle='#000'; ctx.textAlign='center';
   drawFit(title||' ', W/2, 393, RW, 30, '400');
   if(division){
@@ -2709,7 +2710,7 @@ function renderBadgeLayout(){
   ctx.fillText('等級', M, 481);
   const chipW=128, chipX=W-M-chipW, chipY=456, chipH=40;
   ctx.fillRect(chipX,chipY,chipW,chipH);
-  ctx.fillStyle='#fff'; ctx.font='700 20px '+CJK; ctx.textAlign='center';
+  ctx.fillStyle='#fff'; ctx.font='600 20px '+CJK; ctx.textAlign='center';
   ctx.fillText(clearance?('LEVEL '+clearance):'LEVEL', chipX+chipW/2, chipY+27);
   ctx.fillStyle='#000';
   ctx.fillRect(M,507,RW,2);
