@@ -21,43 +21,42 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
 #status:empty{display:none}
 </style>
 <div class="wrap">
-  <div class="card"><h3>名牌製作（直向 480×800）</h3>
-    <p class="small">上傳照片、填姓名／職稱與載具號碼；版面：公司 logo → 照片 → 名字 → 條碼。存到裝置後設成待機「名牌」。</p></div>
+  <div class="card"><h3>Badge builder (portrait 480x800)</h3>
+    <p class="small">Fill the fields, pick a layout and a code, then save to the device and set 休眠屏幕 = 名牌. Latin text stays crisp on this panel; small CJK glyphs come out muddy, so prefer English.</p></div>
   <div class="card">
-    <label>照片 <input type="file" id="photo" accept="image/*"></label>
-    <label style="flex-direction:row;align-items:center;gap:10px">顯示照片
+    <label>Photo <input type="file" id="photo" accept="image/*"></label>
+    <label style="flex-direction:row;align-items:center;gap:10px">Show photo
       <input type="checkbox" id="showPhoto" checked style="width:20px;height:20px">
     </label>
-    <label>姓名 <input type="text" id="name" maxlength="12" placeholder="你的名字"></label>
-    <label>職稱 <input type="text" id="title" maxlength="20" placeholder="職稱"></label>
-    <label>排版 <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="classic">經典（照片在上、大字在下）</option>
-      <option value="badge">工牌（同事版：黑底標題列＋大名字＋QR）</option>
+    <label>Name <input type="text" id="name" maxlength="20" placeholder="KEVIN CHUANG"></label>
+    <label>Title <input type="text" id="title" maxlength="24" placeholder="BACKEND ENGINEER"></label>
+    <label>Layout <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="classic">Classic (photo on top, text below)</option>
+      <option value="badge">ID badge (black band, big name, code)</option>
     </select></label>
     <div id="badgeOnly" style="display:none">
-      <label>標題列主字（不填＝用 logo） <input type="text" id="headMain" maxlength="14" placeholder="例：INTERAGENT" spellcheck="false"></label>
-      <label>標題列副字（小字、字距拉開） <input type="text" id="headSub" maxlength="30" placeholder="例：STAFF IDENTIFICATION" spellcheck="false"></label>
-      <label>員工編號 <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
-      <label>部門／標語 <input type="text" id="division" maxlength="40" placeholder="SCIENCE &amp; TECHNOLOGY DIVISION" spellcheck="false"></label>
-      <label>權限等級 <input type="text" id="clearance" maxlength="6" placeholder="7" spellcheck="false"></label>
+      <label>Header wordmark (blank = SARA logo) <input type="text" id="headMain" maxlength="14" placeholder="e.g. INTERAGENT" spellcheck="false"></label>
+      <label>Header subtitle <input type="text" id="headSub" maxlength="30" placeholder="STAFF IDENTIFICATION" spellcheck="false"></label>
+      <label>Employee ID <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
+      <label>Division <input type="text" id="division" maxlength="40" placeholder="INFORMATION TECHNOLOGY" spellcheck="false"></label>
     </div>
-    <label>條碼類型 <select id="codeType" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="barcode">一維碼（Code 39）</option>
+    <label>Code type <select id="codeType" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="barcode">1D barcode (Code 39)</option>
       <option value="qr">QR Code</option>
-      <option value="none">不顯示</option>
+      <option value="none">None</option>
     </select></label>
-    <label>內容（載具號碼或網址） <input type="text" id="codeValue" maxlength="120" placeholder="/SM6OLEQ 或 https://…" spellcheck="false"></label>
-    <label>照片抖色顆粒 <select id="ditherCell" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="1">細 1px（不建議，這片面板會糊）</option>
-      <option value="2" selected>中 2px（建議起點）</option>
-      <option value="3">粗 3px（面板最吃得下）</option>
+    <label>Content (carrier number or URL) <input type="text" id="codeValue" maxlength="120" placeholder="/SM6OLEQ or https://..." spellcheck="false"></label>
+    <label>Photo dither grain <select id="ditherCell" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="1">fine 1px (not recommended, muddies)</option>
+      <option value="2" selected>medium 2px (suggested)</option>
+      <option value="3">coarse 3px</option>
     </select></label>
-    <p id="carrierStatus" class="small">一維碼請填 / 開頭 8 碼載具號；QR Code 可填任意網址或文字。</p>
+    <p id="carrierStatus" class="small">Code 39 wants / plus 7 characters; QR Code takes any URL or text.</p>
   </div>
   <div class="card">
     <div class="preview"><canvas id="cv" width="480" height="800"></canvas></div>
-    <div class="row"><button id="render">重新預覽</button><button id="save" class="primary">存到裝置（待機名牌）</button></div>
-    <p class="small">存檔位置：<b>/.crosspoint/badge.bmp</b>；裝置端：<b>設定 → 顯示 → 休眠屏幕 → 名牌</b>。</p>
+    <div class="row"><button id="render">Preview</button><button id="save" class="primary">Save to device</button></div>
+    <p class="small">Saved to <b>/.crosspoint/badge.bmp</b>. On the device: <b>Settings → Display → Sleep screen → 名牌 (Nameplate)</b>.</p>
     <p id="status" class="small"></p>
   </div>
 </div>
@@ -2384,7 +2383,6 @@ function saveForm(){
       headSub:document.getElementById('headSub').value,
       agentId:document.getElementById('agentId').value,
       division:document.getElementById('division').value,
-      clearance:document.getElementById('clearance').value,
       codeType:document.getElementById('codeType').value,
       codeValue:document.getElementById('codeValue').value,
       ditherCell:document.getElementById('ditherCell').value,
@@ -2404,7 +2402,6 @@ function loadForm(){
     if(d.headSub) document.getElementById('headSub').value=d.headSub;
     if(d.agentId) document.getElementById('agentId').value=d.agentId;
     if(d.division) document.getElementById('division').value=d.division;
-    if(d.clearance) document.getElementById('clearance').value=d.clearance;
     if(d.codeType) document.getElementById('codeType').value=d.codeType;
     if(d.codeValue) document.getElementById('codeValue').value=d.codeValue;
     if(d.ditherCell) document.getElementById('ditherCell').value=d.ditherCell;
@@ -2438,7 +2435,7 @@ document.getElementById('codeValue').oninput=()=>{saveForm();render();};
 document.getElementById('ditherCell').onchange=()=>{saveForm();render();};
 document.getElementById('layout').onchange=()=>{saveForm();syncLayoutFields();render();};
 document.getElementById('showPhoto').onchange=()=>{saveForm();render();};
-for(const id of ['headMain','headSub','agentId','division','clearance']) document.getElementById(id).oninput=()=>{saveForm();render();};
+for(const id of ['headMain','headSub','agentId','division']) document.getElementById(id).oninput=()=>{saveForm();render();};
 function syncLayoutFields(){document.getElementById('badgeOnly').style.display=document.getElementById('layout').value==='badge'?'block':'none';}
 
 // Code 39 narrow/wide encodings. Mobile barcodes use '/' followed by seven
@@ -2652,7 +2649,6 @@ function renderBadgeLayout(){
   const title=(g('title').value||'').trim();
   const agentId=(g('agentId').value||'').trim();
   const division=(g('division').value||'').trim();
-  const clearance=(g('clearance').value||'').trim();
   const codeType=g('codeType').value;
   const codeValue=(g('codeValue').value||'').trim();
   const showPhoto=g('showPhoto').checked;
