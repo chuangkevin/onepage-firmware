@@ -25,6 +25,9 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
     <p class="small">上傳照片、填姓名／職稱與載具號碼；版面：公司 logo → 照片 → 名字 → 條碼。存到裝置後設成待機「名牌」。</p></div>
   <div class="card">
     <label>照片 <input type="file" id="photo" accept="image/*"></label>
+    <label style="flex-direction:row;align-items:center;gap:10px">顯示照片
+      <input type="checkbox" id="showPhoto" checked style="width:20px;height:20px">
+    </label>
     <label>姓名 <input type="text" id="name" maxlength="12" placeholder="你的名字"></label>
     <label>職稱 <input type="text" id="title" maxlength="20" placeholder="職稱"></label>
     <label>排版 <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
@@ -2374,6 +2377,7 @@ function saveForm(){
       name:document.getElementById('name').value,
       title:document.getElementById('title').value,
       layout:document.getElementById('layout').value,
+      showPhoto:document.getElementById('showPhoto').checked,
       agentId:document.getElementById('agentId').value,
       division:document.getElementById('division').value,
       clearance:document.getElementById('clearance').value,
@@ -2391,6 +2395,7 @@ function loadForm(){
     if(d.name) document.getElementById('name').value=d.name;
     if(d.title) document.getElementById('title').value=d.title;
     if(d.layout){ document.getElementById('layout').value=d.layout; syncLayoutFields(); }
+    if(d.showPhoto!==undefined) document.getElementById('showPhoto').checked=!!d.showPhoto;
     if(d.agentId) document.getElementById('agentId').value=d.agentId;
     if(d.division) document.getElementById('division').value=d.division;
     if(d.clearance) document.getElementById('clearance').value=d.clearance;
@@ -2426,6 +2431,7 @@ document.getElementById('codeType').onchange=()=>{saveForm();render();};
 document.getElementById('codeValue').oninput=()=>{saveForm();render();};
 document.getElementById('ditherCell').onchange=()=>{saveForm();render();};
 document.getElementById('layout').onchange=()=>{saveForm();syncLayoutFields();render();};
+document.getElementById('showPhoto').onchange=()=>{saveForm();render();};
 for(const id of ['agentId','division','clearance']) document.getElementById(id).oninput=()=>{saveForm();render();};
 function syncLayoutFields(){document.getElementById('badgeOnly').style.display=document.getElementById('layout').value==='badge'?'block':'none';}
 
@@ -2448,7 +2454,7 @@ function render(){
   const codeType=document.getElementById('codeType').value;
   const qrMode = codeType==='qr';
   const px=60, py=qrMode?140:170, pw=W-120, ph=qrMode?270:340;
-  if(photoImg){
+  if(photoImg && document.getElementById('showPhoto').checked){
     drawCover(photoImg,px,py,pw,ph,14);
     // Dither the photo alone, so its midtones survive on a 1-bit panel.
     // Everything drawn afterwards (logo, name, title, barcode) stays solid
@@ -2670,7 +2676,7 @@ function renderBadgeLayout(){
   y+=44;
 
   // --- photo (optional; the reference has none) -------------------------
-  if(photoImg){
+  if(photoImg && document.getElementById('showPhoto').checked){
     const ph=190, pw=W-2*M;
     drawCover(photoImg,M,y+12,pw,ph,10);
     ditherRegion(M,y+12,pw,ph,ditherCell);
