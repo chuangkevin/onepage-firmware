@@ -1928,12 +1928,10 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   // Wait for display to finish updating
   if (Serial)
     Serial.printf("[%lu]   Waiting for display refresh...\n", millis());
-  // Bound the wait generously. The panel legitimately needs more than 5 s here
-  // at times (a full refresh measured 3.5-5+ s, and the waveform stretches when
-  // the panel is cold); cutting it short leaves the waveform half-driven, which
-  // both looks wrong and can wedge the controller so it will not wake. A wedged
-  // BUSY line is the rarer case; 12 s keeps the UI responsive enough.
-  waitWhileBusy(refreshType, 12000);
+  // Keep the bound short: a wedged BUSY line must never freeze the UI. The
+  // measured full refresh here is ~3.8 s, so 5 s leaves margin without the
+  // 30 s stall the panel can otherwise impose.
+  waitWhileBusy(refreshType, 5000);
 }
 
 void EInkDisplay::setCustomLUT(const bool enabled,
@@ -1985,10 +1983,8 @@ void EInkDisplay::deepSleep() {
 
     sendCommand(CMD_MASTER_ACTIVATION);
 
-    // Wait for the power-down sequence to complete. This runs immediately before
-    // deep sleep, so a long wait costs nothing and prevents sending the panel
-    // sleep command while it is still draining.
-    waitWhileBusy(" display power-down", 20000);
+    // Wait for the power-down sequence to complete
+    waitWhileBusy(" display power-down");
 
     isScreenOn = false;
   }
