@@ -142,6 +142,10 @@ class EInkDisplay {
   uint16_t displayWidthBytes = DISPLAY_WIDTH_BYTES;
   uint32_t bufferSize = BUFFER_SIZE;
   bool _x3Mode = false;
+  // Set by pollBusy when the BUSY line never released within the bound, i.e.
+  // the controller did not finish the waveform. refreshDisplay uses it to
+  // re-arm the panel instead of leaving it wedged for the next frame.
+  bool _busyTimedOut = false;
   bool _x3RedRamSynced = false;
   struct X3GrayState {
     bool lastBaseWasPartial = false;

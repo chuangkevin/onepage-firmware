@@ -616,6 +616,7 @@ void EInkDisplay::waitForRefresh(const char *comment, unsigned long timeoutMs) {
 
 void EInkDisplay::pollBusy(const char *comment, const char *completeWord, unsigned long timeoutMs) {
   unsigned long start = millis();
+  _busyTimedOut = false;
   if (!_x3Mode) {
     // OnePage/X4-class SSD1677: BUSY is driven HIGH while the controller runs a
     // waveform and drops LOW when it finishes.
@@ -642,6 +643,9 @@ void EInkDisplay::pollBusy(const char *comment, const char *completeWord, unsign
       if (millis() - start > timeoutMs)
         break;
     }
+    // Still high after the bound: the controller never finished the waveform.
+    if (digitalRead(_busy) == HIGH)
+      _busyTimedOut = true;
   } else {
     // X3 (UC81xx-class): BUSY is active LOW. Idle = HIGH, working = LOW.
     // After a command that does work, BUSY transitions HIGH -> LOW (work
@@ -1932,6 +1936,26 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   // measured full refresh here is ~3.8 s, so 5 s leaves margin without the
   // 30 s stall the panel can otherwise impose.
   waitWhileBusy(refreshType, 5000);
+
+  if (_busyTimedOut) {
+    // The controller never finished the waveform (BUSY stayed asserted past the
+    // bound). Left alone it stays wedged: the next frame is pushed into a busy
+    // controller, and the panel is still mid-operation when its rail is cut for
+    // deep sleep -- which is what makes the screen come out patchy AND leaves
+    // the device unable to wake. Re-assert power-on with the same mode bits and
+    // activate again; the controller restarts the waveform from the RAM it
+    // already holds, so no frame data is lost.
+    if (Serial)
+      Serial.printf("[%lu]   BUSY stuck after %s refresh; re-arming panel\n", millis(), refreshType);
+    sendCommand(CMD_WRITE_TEMP);
+    sendData(0x19);
+    sendCommand(CMD_DISPLAY_UPDATE_CTRL2);
+    sendData(static_cast<uint8_t>(displayMode | 0xC0));
+    sendCommand(CMD_MASTER_ACTIVATION);
+    waitWhileBusy(refreshType, 5000);
+    if (_busyTimedOut && Serial)
+      Serial.printf("[%lu]   panel still busy after re-arm\n", millis());
+  }
 }
 
 void EInkDisplay::setCustomLUT(const bool enabled,
