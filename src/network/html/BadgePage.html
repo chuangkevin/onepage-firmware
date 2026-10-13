@@ -2408,7 +2408,6 @@ document.getElementById('title').oninput=()=>{saveForm();render();};
 document.getElementById('codeType').onchange=()=>{saveForm();render();};
 document.getElementById('codeValue').oninput=()=>{saveForm();render();};
 document.getElementById('ditherCell').onchange=()=>{saveForm();render();};
-loadForm();
 
 // Code 39 narrow/wide encodings. Mobile barcodes use '/' followed by seven
 // uppercase alphanumeric characters; the numeric patterns are the standard
@@ -2637,6 +2636,11 @@ function setStatus(t){document.getElementById('status').textContent=t;}
 
 logoImg.onload=render;
 logoImg.onerror=render;
+// Restore the remembered form only now that every declaration above has been
+// evaluated. loadForm() renders, and render() reaches drawCode39(), which reads
+// the `const CODE39_CHARS` tables declared above this line; calling it earlier
+// threw a TDZ ReferenceError that silently killed both the preview and save().
+loadForm();
 if(logoImg.complete) render(); else render();
 </script>
 </html>
