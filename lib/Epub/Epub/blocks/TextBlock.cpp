@@ -9,8 +9,10 @@
 
 #include "../LayoutMode.h"
 
-// Sentence punctuation and closing brackets: vertical Chinese typesetting puts
-// these at the top-right of the character cell instead of centring them.
+// Sentence punctuation only. Vertical Chinese typesetting puts these at the
+// TOP-RIGHT of the character cell. Brackets (「」『』（）【】《》) are deliberately
+// NOT in this set: their glyphs already fill the em box, so they belong centred
+// and shifting them just looks broken.
 static bool isVerticalTopRightPunctuation(const uint32_t cp) {
   switch (cp) {
     case 0x3001:  // 、
@@ -21,13 +23,6 @@ static bool isVerticalTopRightPunctuation(const uint32_t cp) {
     case 0xFF1A:  // ：
     case 0xFF01:  // ！
     case 0xFF1F:  // ？
-    case 0x300D:  // 」
-    case 0x300F:  // 』
-    case 0x3011:  // 】
-    case 0x300B:  // 》
-    case 0xFF09:  // ）
-    case 0xFF3D:  // ］
-    case 0xFF5D:  // ｝
       return true;
     default:
       return false;
@@ -61,7 +56,6 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
     //  - sentence punctuation and closing brackets move to the top-right of the
     //    cell, which is where vertical Chinese typesetting puts them.
     const int lineHeight = renderer.getLineHeight(fontId);
-    const int quarterEm = lineHeight / 4;
     int down = 0;
     for (size_t i = 0; i < words.size(); i++) {
       const std::string& word = words[i];
@@ -79,8 +73,10 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
         int gx = x + (lineHeight - glyphWidth) / 2;
         int gy = y + down;
         if (isVerticalTopRightPunctuation(cp)) {
-          gx += quarterEm;
-          gy -= quarterEm;
+          // Half a cell right and up: the glyph's ink sits low-left in the em box,
+          // so this lands it in the top-right corner as vertical typesetting wants.
+          gx += lineHeight / 2;
+          gy -= lineHeight / 2;
         }
         renderer.drawText(fontId, gx, gy, glyph.c_str(), true, verticalStyle, baseDir);
         down += lineHeight;
