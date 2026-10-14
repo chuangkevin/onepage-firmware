@@ -1941,23 +1941,15 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   waitWhileBusy(refreshType, refreshTimeoutMs);
 
   if (_busyTimedOut) {
-    // Even a generous budget expired and BUSY is still asserted, so the
-    // controller is wedged rather than merely slow. Re-activating does not clear
-    // it (verified: the retry also sat at the bound) and neither does
-    // CMD_SOFT_RESET (also timed out). Only a real reset recovers it, which means
-    // pulsing GPIO27 -- safe only when no SD card is mounted, because GPIO27 is
-    // also the card's power rail. recoverPanel() checks that.
-    recoverPanel();
-    sendCommand(CMD_WRITE_TEMP);
-    sendData(0x19);
-    sendCommand(CMD_DISPLAY_UPDATE_CTRL2);
-    sendData(static_cast<uint8_t>(displayMode | 0xC0));
-    sendCommand(CMD_MASTER_ACTIVATION);
-    waitWhileBusy(refreshType, refreshTimeoutMs);
-    if (_busyTimedOut && Serial)
-      Serial.printf("[%lu]   panel still busy after reset\n", millis());
-    else if (Serial)
-      Serial.printf("[%lu]   panel recovered\n", millis());
+    // BUSY never released: the controller is wedged, not merely slow. Nothing in
+    // software recovers it -- re-activating does not clear it, and a soft reset
+    // times out too (both measured on hardware). Only cycling the panel's power
+    // rail does, and that rail is shared with the SD card, so it cannot be pulsed
+    // without risking the card. Log it and carry on: retrying here just froze the
+    // UI for ~20 s per frame, which is what made the device look hung.
+    if (Serial)
+      Serial.printf("[%lu]   panel wedged: BUSY held past %lu ms; a power cycle is needed\n", millis(),
+                    refreshTimeoutMs);
   }
 }
 
@@ -1967,44 +1959,6 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
 // and re-programs every register, including the RAM window), then put the frame
 // we were showing back from the buffer we still hold, so the retry paints the
 // intended image rather than whatever the reset left in RAM.
-void EInkDisplay::recoverPanel() {
-  if (Serial)
-    Serial.printf("[%lu]   panel wedged (BUSY never released); recovering\n", millis());
-  _busyTimedOut = false;
-
-  // A wedged SSD1677 only comes back after a real reset: CMD_SOFT_RESET alone
-  // also times out (verified on hardware). Pulsing _rst does that, but on OnePage
-  // GPIO27 is also the SD power rail, so it is only allowed when no card is
-  // mounted (main.cpp sets _allowHardwareReset from Storage.usingInternalStorage()).
-  if (_allowHardwareReset) {
-    if (Serial)
-      Serial.printf("[%lu]   no SD mounted; pulsing panel reset\n", millis());
-    pinMode(_rst, OUTPUT);
-    digitalWrite(_rst, LOW);
-    delay(20);
-    digitalWrite(_rst, HIGH);
-    delay(60);
-  } else if (Serial) {
-    Serial.printf("[%lu]   SD mounted; hardware reset withheld, software re-init only\n", millis());
-  }
-
-  initDisplayController();
-
-  // Force the next activation to assert CLOCK_ON/ANALOG_ON again: the reset
-  // dropped the analog rails.
-  isScreenOn = false;
-
-  setRamArea(0, 0, displayWidth, displayHeight);
-  if (frameBuffer != nullptr) {
-    writeRamBuffer(CMD_WRITE_RAM_BW, frameBuffer, bufferSize);
-    writeRamBuffer(CMD_WRITE_RAM_RED, frameBuffer, bufferSize);
-  }
-
-  _busyTimedOut = false;
-  if (Serial)
-    Serial.printf("[%lu]   panel re-initialized, frame restored\n", millis());
-}
-
 void EInkDisplay::setCustomLUT(const bool enabled,
                                const unsigned char *lutData) {
   if (enabled) {

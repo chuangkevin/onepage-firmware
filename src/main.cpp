@@ -363,15 +363,10 @@ void setup() {
   // We need 6 open files concurrently when parsing a new chapter
   if (!Storage.begin()) {
     LOG_ERR("MAIN", "SD card initialization failed");
-    display.setAllowHardwareResetOnRecovery(true);  // no mounted card: GPIO27 is free
     setupDisplayAndFonts(isSilentReboot);
     activityManager.goToFullScreenMessage("SD card error", EpdFontFamily::BOLD);
     return;
   }
-
-  // GPIO27 is both the EPD reset and the SD power rail, so the panel-wedge
-  // recovery may only pulse it when the internal volume is in use (no card).
-  display.setAllowHardwareResetOnRecovery(Storage.usingInternalStorage());
 
   HalSystem::checkPanic();
 

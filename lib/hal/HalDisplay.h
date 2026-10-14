@@ -44,10 +44,6 @@ class HalDisplay {
   // Power management
   void deepSleep();
 
-  // See EInkDisplay::setAllowHardwareResetOnRecovery. main.cpp sets this from
-  // Storage.usingInternalStorage(): the panel reset line is shared with the SD
-  // power rail, so it may only be pulsed when no card is mounted.
-  void setAllowHardwareResetOnRecovery(bool allow);
 
   // Access to frame buffer
   uint8_t* getFrameBuffer() const;
