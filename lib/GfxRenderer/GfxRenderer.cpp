@@ -1365,8 +1365,6 @@ void GfxRenderer::invertScreen() const {
 void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const {
   auto elapsed = millis() - start_ms;
   LOG_DBG("GFX", "Time = %lu ms from clearScreen to displayBuffer", elapsed);
-  lastRefreshMode = refreshMode;
-  if (suppressDisplay) return;
   // NOTE: HalDisplay::displayBuffer's second parameter is turnOffScreen, NOT a
   // fading-fix flag. This call used to pass `fadingFix`, so enabling the
   // "sunlight fading fix" setting powered the panel down after every frame and

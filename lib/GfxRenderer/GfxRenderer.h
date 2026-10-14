@@ -38,8 +38,6 @@ class GfxRenderer {
   };
 
  private:
-  mutable bool suppressDisplay = false;
-  mutable HalDisplay::RefreshMode lastRefreshMode = HalDisplay::FAST_REFRESH;
   static constexpr size_t BW_BUFFER_CHUNK_SIZE = 8000;  // 8KB chunks to allow for non-contiguous memory
 
   HalDisplay& display;
@@ -225,13 +223,6 @@ class GfxRenderer {
 
   // Grayscale functions
   void setRenderMode(const RenderMode mode) { this->renderMode = mode; }
-
-  // When suppressed, displayBuffer() records the requested refresh mode and
-  // returns without refreshing. It lets a caller draw a screen twice - once for
-  // the 1-bit frame, once per grayscale plane for text anti-aliasing - and push
-  // the result with a single refresh.
-  void setSuppressDisplay(const bool suppress) const { suppressDisplay = suppress; }
-  HalDisplay::RefreshMode lastRequestedRefreshMode() const { return lastRefreshMode; }
   RenderMode getRenderMode() const { return renderMode; }
   // Grayscale preconditioning settle pass (no-op on X4). The rect overload
   // takes the gray region in LOGICAL screen coordinates and rotates it to the
