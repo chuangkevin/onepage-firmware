@@ -10,6 +10,7 @@ namespace {
 
 constexpr size_t kCharCount = sizeof(S2T::kChars) / sizeof(S2T::kChars[0]);
 constexpr size_t kPhraseCount = sizeof(S2T::kPhrases) / sizeof(S2T::kPhrases[0]);
+constexpr size_t kTwCount = sizeof(S2T::kTwChars) / sizeof(S2T::kTwChars[0]);
 
 // Traditional form of one codepoint, or 0 when it is not a simplified character.
 uint16_t mapChar(const uint32_t cp) {
@@ -26,6 +27,37 @@ uint16_t mapChar(const uint32_t cp) {
     }
   }
   return 0;
+}
+
+void appendCodepoint(std::string& out, uint32_t cp);
+
+// Generic traditional -> Taiwan variant (裏 -> 裡, 麪 -> 麵, ...). Applied to every
+// codepoint that reaches the output, including the ones that came from phrases.
+uint32_t taiwanVariant(const uint32_t cp) {
+  if (cp > 0xFFFF) return cp;
+  size_t lo = 0, hi = kTwCount;
+  while (lo < hi) {
+    const size_t mid = lo + (hi - lo) / 2;
+    const uint16_t key = S2T::kTwChars[mid][0];
+    if (key == cp) return S2T::kTwChars[mid][1];
+    if (key < cp) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return cp;
+}
+
+// Appends `text` (UTF-8) with the Taiwan variant applied per codepoint.
+void appendConverted(std::string& out, const char* text, const size_t len) {
+  size_t i = 0;
+  while (i < len) {
+    size_t n = EpubLayout::utf8SeqLen(static_cast<uint8_t>(text[i]));
+    if (i + n > len) n = 1;
+    appendCodepoint(out, taiwanVariant(EpubLayout::utf8FirstCodepoint(std::string(text + i, n))));
+    i += n;
+  }
 }
 
 void appendCodepoint(std::string& out, const uint32_t cp) {
@@ -79,7 +111,7 @@ std::string convert(const std::string& in) {
       const S2T::Phrase& ph = S2T::kPhrases[k];
       if (i + ph.srcLen > in.size()) continue;
       if (std::memcmp(in.data() + i, S2T::kBlob + ph.srcOff, ph.srcLen) != 0) continue;
-      out.append(S2T::kBlob + ph.dstOff, ph.dstLen);
+      appendConverted(out, S2T::kBlob + ph.dstOff, ph.dstLen);
       i += ph.srcLen;
       matched = true;
       break;
@@ -87,11 +119,7 @@ std::string convert(const std::string& in) {
     if (matched) continue;
 
     const uint16_t mapped = mapChar(cp);
-    if (mapped != 0) {
-      appendCodepoint(out, mapped);
-    } else {
-      out.append(in, i, len);
-    }
+    appendCodepoint(out, taiwanVariant(mapped != 0 ? mapped : cp));
     i += len;
   }
   return out;

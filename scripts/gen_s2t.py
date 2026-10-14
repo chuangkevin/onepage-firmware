@@ -65,12 +65,13 @@ def load_phrases(path, chars):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ascii-dir", required=True, help="directory holding stc.txt and stp.txt")
+    ap.add_argument("--ascii-dir", required=True, help="directory holding stc.txt/stp.txt/twv.txt")
     ap.add_argument("--out", default="lib/Epub/Epub/SimplifiedToTraditional.h")
     a = ap.parse_args()
     d = pathlib.Path(a.ascii_dir)
 
     chars = load_chars(d / "stc.txt")
+    tw = load_chars(d / "twv.txt")     # generic traditional -> Taiwan variants
     phrases = load_phrases(d / "stp.txt", chars)
     if not chars:
         sys.exit("no characters loaded")
@@ -135,11 +136,23 @@ def main():
         lines.append("  " + "".join(row))
     lines.append("};")
     lines.append("")
+    lines.append(f"// {len(tw)} Taiwan-variant characters, applied after the conversion.")
+    lines.append("inline constexpr uint16_t kTwChars[][2] = {")
+    row = []
+    for k in sorted(tw):
+        row.append(f"{{0x{k:04X},0x{tw[k]:04X}}},")
+        if len(row) == 8:
+            lines.append("  " + "".join(row))
+            row = []
+    if row:
+        lines.append("  " + "".join(row))
+    lines.append("};")
+    lines.append("")
     lines.append("}  // namespace S2T")
     lines.append("")
 
     pathlib.Path(a.out).write_text("\n".join(lines), encoding="utf-8")
-    print(f"{a.out}: {len(chars)} chars, {len(phrases)} phrases, blob {len(blob)} bytes, "
+    print(f"{a.out}: {len(chars)} chars, {len(phrases)} phrases, {len(tw)} tw-variants, blob {len(blob)} bytes, "
           f"source {pathlib.Path(a.out).stat().st_size} bytes")
 
 
