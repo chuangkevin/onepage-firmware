@@ -17,7 +17,7 @@
 // are appended after the built-in fonts. Otherwise only built-in fonts are listed.
 inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   // Built-in font labels (StrId)
-  std::vector<StrId> enumValues = {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS};
+  std::vector<StrId> enumValues = {StrId::STR_NOTO_SERIF};
   // Runtime string labels for SD card fonts
   std::vector<std::string> enumStringValues;
 
@@ -38,8 +38,9 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   // with all options when SD fonts are present.
   std::vector<std::string> allStringValues;
   if (sdFontCount > 0) {
+    // Only Noto Serif ships (Noto Sans was dropped to save flash), so a single
+    // built-in entry precedes the SD-card families.
     allStringValues.push_back(I18N.get(StrId::STR_NOTO_SERIF));
-    allStringValues.push_back(I18N.get(StrId::STR_NOTO_SANS));
     allStringValues.insert(allStringValues.end(), enumStringValues.begin(), enumStringValues.end());
   }
 
@@ -192,7 +193,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         // Built-in font-family entry. Replaced per-call with a registry-aware
         // version when SD fonts are installed.
         SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
-                          {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS}, "fontFamily", StrId::STR_CAT_READER),
+                          {StrId::STR_NOTO_SERIF}, "fontFamily", StrId::STR_CAT_READER),
         SettingInfo::Enum(StrId::STR_FONT_SIZE, &CrossPointSettings::fontSize,
                           {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE}, "fontSize",
                           StrId::STR_CAT_READER),
