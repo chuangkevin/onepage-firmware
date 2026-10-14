@@ -1,6 +1,7 @@
 #include "CrossPointSettings.h"
 
 #include <HalStorage.h>
+#include <SDCardManager.h>
 #include <JsonSettingsIO.h>
 #include <Logging.h>
 #include <Serialization.h>
@@ -27,6 +28,8 @@ constexpr uint8_t SETTINGS_FILE_VERSION = 1;
 constexpr char SETTINGS_FILE_BIN[] = "/.crosspoint/settings.bin";
 constexpr char SETTINGS_FILE_JSON[] = "/.crosspoint/settings.json";
 constexpr char SETTINGS_FILE_BAK[] = "/.crosspoint/settings.bin.bak";
+// Copy kept on the always-present internal volume (see saveToFile).
+constexpr char SETTINGS_FILE_MIRROR[] = "/.crosspoint/settings.json";
 constexpr char LANG_FILE_BIN[] = "/.crosspoint/language.bin";
 constexpr char LANG_FILE_BAK[] = "/.crosspoint/language.bin.bak";
 
@@ -97,10 +100,32 @@ uint8_t CrossPointSettings::sleepTimeoutEnumToMinutes(const uint8_t legacyValue)
 
 bool CrossPointSettings::saveToFile() const {
   Storage.mkdir("/.crosspoint");
-  return JsonSettingsIO::saveSettings(*this, SETTINGS_FILE_JSON);
+  const bool ok = JsonSettingsIO::saveSettings(*this, SETTINGS_FILE_JSON);
+  // Mirror onto the internal flash as well: the card is the active volume, so
+  // without this, removing the card silently reverts every setting to whatever the
+  // internal copy held at flash time.
+  if (Storage.usingInternalStorage()) return ok;
+  String json = Storage.readFile(SETTINGS_FILE_JSON);
+  if (!json.isEmpty()) {
+    SDCardManager::getInstance().writeInternalFile(SETTINGS_FILE_MIRROR, json.c_str());
+  }
+  return ok;
 }
 
 bool CrossPointSettings::loadFromFile() {
+  // No settings on the active volume (e.g. a freshly inserted or removed card):
+  // restore from the internal mirror before falling back to defaults.
+  if (!Storage.exists(SETTINGS_FILE_JSON)) {
+    String mirrored;
+    if (SDCardManager::getInstance().readInternalFile(SETTINGS_FILE_MIRROR, mirrored) && !mirrored.isEmpty()) {
+      bool resave = false;
+      if (JsonSettingsIO::loadSettings(*this, mirrored.c_str(), &resave)) {
+        LOG_DBG("CPS", "Restored settings from the internal mirror");
+        saveToFile();  // publish them onto the active volume
+        return true;
+      }
+    }
+  }
   // Try JSON first
   if (Storage.exists(SETTINGS_FILE_JSON)) {
     String json = Storage.readFile(SETTINGS_FILE_JSON);

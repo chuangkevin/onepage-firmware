@@ -71,6 +71,13 @@ class SDCardManager {
   void suspendForPanelReset();
   bool resumeAfterPanelReset();
 
+  // Settings live on the active volume, which is the card when one is inserted, so
+  // pulling the card used to roll the user back to whatever the internal volume
+  // held. These mirror a small file onto the internal flash (always present) and
+  // read it back, without disturbing the microSD as the working volume.
+  bool writeInternalFile(const char* path, const char* content);
+  bool readInternalFile(const char* path, String& out);
+
  private:
   static SDCardManager instance;
 

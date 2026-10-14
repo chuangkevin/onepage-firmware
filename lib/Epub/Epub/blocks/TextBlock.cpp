@@ -9,6 +9,16 @@
 
 #include "../LayoutMode.h"
 
+// Encodes one codepoint as UTF-8 into buf; returns the byte count (0 if invalid).
+static int encodeUtf8(const uint32_t cp, char* buf) {
+  if (cp < 0x80) { buf[0] = static_cast<char>(cp); return 1; }
+  if (cp < 0x800) { buf[0] = static_cast<char>(0xC0 | (cp >> 6)); buf[1] = static_cast<char>(0x80 | (cp & 0x3F)); return 2; }
+  buf[0] = static_cast<char>(0xE0 | (cp >> 12));
+  buf[1] = static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+  buf[2] = static_cast<char>(0x80 | (cp & 0x3F));
+  return 3;
+}
+
 // Sentence punctuation only. Vertical Chinese typesetting puts these at the
 // TOP-RIGHT of the character cell. Brackets (「」『』（）【】《》) are deliberately
 // NOT in this set: their glyphs already fill the em box, so they belong centred
@@ -26,6 +36,26 @@ static bool isVerticalTopRightPunctuation(const uint32_t cp) {
       return true;
     default:
       return false;
+  }
+}
+
+// The font's own glyph for vertical setting. Using these beats shifting the
+// horizontal glyph by a fraction of a cell, which is only ever an approximation and
+// is what made vertical punctuation look wrong. Zero means "no vertical form".
+static uint32_t verticalFormOf(const uint32_t cp) {
+  switch (cp) {
+    case 0x3001: return 0xFE11;  // 、
+    case 0x3002: return 0xFE12;  // 。
+    case 0xFF0C: return 0xFE10;  // ，
+    case 0xFF1A: return 0xFE13;  // ：
+    case 0xFF1B: return 0xFE14;  // ；
+    case 0xFF01: return 0xFE15;  // ！
+    case 0xFF1F: return 0xFE16;  // ？
+    case 0x300C: return 0xFE41;  // 「
+    case 0x300D: return 0xFE42;  // 」
+    case 0x300E: return 0xFE43;  // 『
+    case 0x300F: return 0xFE44;  // 』
+    default: return 0;
   }
 }
 
@@ -69,16 +99,36 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
         p += take;
 
         const uint32_t cp = EpubLayout::utf8FirstCodepoint(glyph);
-        const int glyphWidth = renderer.getTextWidth(fontId, glyph.c_str(), verticalStyle, baseDir);
-        int gx = x + (lineHeight - glyphWidth) / 2;
+        std::string draw = glyph;
+        int gx = x;
         int gy = y + down;
-        if (isVerticalTopRightPunctuation(cp)) {
-          // Half a cell right and up: the glyph's ink sits low-left in the em box,
-          // so this lands it in the top-right corner as vertical typesetting wants.
-          gx += lineHeight / 2;
-          gy -= lineHeight / 2;
+        bool placed = false;
+
+        // Prefer the font's vertical form: its ink is already positioned for a
+        // vertical cell, so it needs no shifting at all.
+        if (const uint32_t vf = verticalFormOf(cp); vf != 0) {
+          std::string vfGlyph;
+          vfGlyph.resize(4);
+          const int n = encodeUtf8(vf, vfGlyph.data());
+          vfGlyph.resize(n > 0 ? n : 0);
+          if (!vfGlyph.empty() && renderer.getTextWidth(fontId, vfGlyph.c_str(), verticalStyle, baseDir) > 0) {
+            draw = vfGlyph;
+            const int w = renderer.getTextWidth(fontId, draw.c_str(), verticalStyle, baseDir);
+            gx = x + (lineHeight - w) / 2;
+            placed = true;
+          }
         }
-        renderer.drawText(fontId, gx, gy, glyph.c_str(), true, verticalStyle, baseDir);
+        if (!placed) {
+          const int glyphWidth = renderer.getTextWidth(fontId, draw.c_str(), verticalStyle, baseDir);
+          gx = x + (lineHeight - glyphWidth) / 2;
+          if (isVerticalTopRightPunctuation(cp)) {
+            // No vertical form in this font: fall back to nudging the horizontal
+            // glyph towards the top-right corner.
+            gx += lineHeight / 2;
+            gy -= lineHeight / 2;
+          }
+        }
+        renderer.drawText(fontId, gx, gy, draw.c_str(), true, verticalStyle, baseDir);
         down += lineHeight;
       }
     }

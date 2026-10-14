@@ -1386,9 +1386,15 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   // In vertical mode the same cursor runs ACROSS the page instead of down it: each
   // extracted "line" is a column, columns advance from the right edge leftwards,
   // and the page runs out of room horizontally rather than vertically.
+  //
+  // The column pitch is the line height the reader's 行距 setting already applies,
+  // plus a quarter-em gutter: vertical CJK needs visible white between columns, and
+  // punctuation hangs into that gutter. Without it the columns read as cramped.
+  const int columnPitch = EpubLayout::vertical ? (lineHeight + lineHeight / 4) : lineHeight;
+  const int advance = EpubLayout::vertical ? columnPitch : lineHeight;
   const int pageExtent = EpubLayout::vertical ? viewportWidth : viewportHeight;
 
-  if (currentPageNextY + lineHeight > pageExtent) {
+  if (currentPageNextY + advance > pageExtent) {
     completePageFn(std::move(currentPage), xpathParagraphIndex, xpathListItemIndex);
     completedPageCount++;
     currentPage.reset(new Page());
@@ -1409,14 +1415,14 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   int16_t xPos;
   int16_t yPos;
   if (EpubLayout::vertical) {
-    xPos = static_cast<int16_t>(viewportWidth - currentPageNextY - lineHeight);
+    xPos = static_cast<int16_t>(viewportWidth - currentPageNextY - columnPitch);
     yPos = 0;
   } else {
     xPos = line->getBlockStyle().leftInset();
     yPos = currentPageNextY;
   }
   currentPage->elements.push_back(std::make_shared<PageLine>(line, xPos, yPos));
-  currentPageNextY += lineHeight;
+  currentPageNextY += advance;
 }
 
 void ChapterHtmlSlimParser::makePages() {

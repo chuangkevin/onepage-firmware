@@ -330,12 +330,16 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
       *it = buildFontFamilySetting(registry);
     }
   }
-  // Insert the UI (menu/interface) font picker (family + size) at the end of
-  // the Display section. Always present (shows at least "Default").
-  auto itd =
-      std::find_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.nameId == StrId::STR_SUNLIGHT_FADING_FIX; });
-  if (itd != v.end()) {
-    v.insert(itd + 1, buildUiFontSetting(registry));
+  // Insert the UI (menu/interface) font picker (family + size) at the end of the
+  // Display section. Always present (shows at least "Default").
+  //
+  // Anchored on the last Display entry rather than on a specific one: this used to
+  // hang off STR_SUNLIGHT_FADING_FIX, and when that setting was removed the anchor
+  // stopped being found and the whole UI-font picker silently disappeared.
+  auto itd = std::find_if(v.rbegin(), v.rend(),
+                          [](const SettingInfo& s) { return s.category == StrId::STR_CAT_DISPLAY; });
+  if (itd != v.rend()) {
+    v.insert(itd.base(), buildUiFontSetting(registry));
   }
   return v;
 }

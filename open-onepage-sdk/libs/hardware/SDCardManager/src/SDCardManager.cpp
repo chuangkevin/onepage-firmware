@@ -538,3 +538,30 @@ bool SDCardManager::resumeAfterPanelReset() {
   if (usingInternal) return true;
   return begin();
 }
+
+bool SDCardManager::writeInternalFile(const char* path, const char* content) {
+  if (!ensureInternalMounted()) return false;
+  // The internal tree has no /.crosspoint on a fresh image.
+  internalVol.mkdir("/.crosspoint", true);
+  FsFile f;
+  if (!(f = internalVol.open(path, O_WRONLY | O_CREAT | O_TRUNC))) return false;
+  const size_t len = strlen(content);
+  const size_t written = f.write(content, len);
+  f.close();
+  return written == len;
+}
+
+bool SDCardManager::readInternalFile(const char* path, String& out) {
+  if (!ensureInternalMounted()) return false;
+  FsFile f;
+  if (!(f = internalVol.open(path, O_RDONLY))) return false;
+  out = "";
+  char buf[256];
+  while (true) {
+    const int n = f.read(buf, sizeof(buf));
+    if (n <= 0) break;
+    out.concat(buf, n);
+  }
+  f.close();
+  return !out.isEmpty();
+}
