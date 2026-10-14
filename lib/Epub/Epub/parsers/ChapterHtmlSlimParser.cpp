@@ -28,6 +28,7 @@ static uint16_t layoutExtent(const BlockStyle& style, const uint16_t viewportWid
 }
 #include "Epub/converters/ImageDecoderFactory.h"
 #include "Epub/converters/ImageToFramebufferDecoder.h"
+#include "Epub/SimplifiedToTraditional.h"
 #include "Epub/htmlEntities.h"
 
 // Minimum file size (in bytes) to show indexing popup - smaller chapters don't benefit from it
@@ -197,7 +198,14 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
 
   // flush the buffer
   partWordBuffer[partWordBufferIndex] = '\0';
-  currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
+  if (convertToTraditional && partWordBufferIndex > 0) {
+    // Convert here rather than per character so phrase rules see a whole run;
+    // CJK text has no spaces, so a run is usually long enough for them to apply.
+    const std::string converted = SimplifiedToTraditional::convert(std::string(partWordBuffer, partWordBufferIndex));
+    currentTextBlock->addWord(converted, fontStyle, false, nextWordContinues);
+  } else {
+    currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
+  }
   partWordBufferIndex = 0;
   nextWordContinues = false;
 }

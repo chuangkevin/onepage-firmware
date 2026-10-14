@@ -47,6 +47,8 @@ class ChapterHtmlSlimParser {
   uint16_t viewportWidth;
   uint16_t viewportHeight;
   bool hyphenationEnabled;
+  // Rewrite simplified Chinese to traditional at parse time (see SimplifiedToTraditional.h).
+  bool convertToTraditional;
   bool focusReadingEnabled;
   const CssParser* cssParser;
   bool embeddedStyle;
@@ -119,7 +121,8 @@ class ChapterHtmlSlimParser {
                                  const bool embeddedStyle, const std::string& contentBase,
                                  const std::string& imageBasePath, const uint8_t imageRendering = 0,
                                  std::vector<std::string> tocAnchors = {},
-                                 const std::function<void()>& popupFn = nullptr, const CssParser* cssParser = nullptr)
+                                 const std::function<void()>& popupFn = nullptr, const CssParser* cssParser = nullptr,
+                                 const bool convertToTraditional = false)
 
       : epub(epub),
         filepath(filepath),
@@ -135,6 +138,7 @@ class ChapterHtmlSlimParser {
         completePageFn(completePageFn),
         popupFn(popupFn),
         cssParser(cssParser),
+        convertToTraditional(convertToTraditional),
         embeddedStyle(embeddedStyle),
         imageRendering(imageRendering),
         contentBase(contentBase),

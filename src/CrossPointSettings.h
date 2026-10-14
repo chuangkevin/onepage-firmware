@@ -247,6 +247,9 @@ class CrossPointSettings {
   // Vertical CJK writing: characters run down the page and columns advance
   // from the right edge leftwards. See lib/Epub/Epub/LayoutMode.h.
   uint8_t verticalText = 0;
+  // Rewrite simplified Chinese to traditional when building pages. See
+  // lib/Epub/Epub/SimplifiedToTraditional.h.
+  uint8_t convertToTraditional = 0;
 
   // Reader screen margin settings
   uint8_t screenMargin = 5;

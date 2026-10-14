@@ -214,6 +214,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         // Vertical CJK writing: only affects EPUB page layout.
         SettingInfo::Toggle(StrId::STR_VERTICAL_TEXT, &CrossPointSettings::verticalText, "verticalText",
                             StrId::STR_CAT_READER),
+        // Simplified -> Traditional rewrite of the book text during layout.
+        SettingInfo::Toggle(StrId::STR_CONVERT_TRADITIONAL, &CrossPointSettings::convertToTraditional,
+                            "convertToTraditional", StrId::STR_CAT_READER),
         SettingInfo::Enum(
             StrId::STR_ORIENTATION, &CrossPointSettings::orientation,
             {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW},

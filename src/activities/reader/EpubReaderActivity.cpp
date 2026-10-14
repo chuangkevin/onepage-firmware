@@ -861,7 +861,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     if (!section->loadSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
                                   SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                   viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
-                                  SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0)) {
+                                  SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0, SETTINGS.convertToTraditional != 0)) {
       LOG_DBG("ERS", "Cache not found, building...");
 
       GUI.drawPopup(renderer, tr(STR_INDEXING));
@@ -871,7 +871,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       if (!section->createSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
                                       SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                       viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
-                                      SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0, popupFn)) {
+                                      SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0, SETTINGS.convertToTraditional != 0, popupFn)) {
         LOG_ERR("ERS", "Failed to persist page data to SD");
         section.reset();
         showPendingSyncSaveError();
@@ -1011,7 +1011,7 @@ void EpubReaderActivity::silentIndexNextChapterIfNeeded(const uint16_t viewportW
   if (nextSection.loadSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
                                   SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                   viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
-                                  SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0)) {
+                                  SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0, SETTINGS.convertToTraditional != 0)) {
     return;
   }
 
@@ -1019,7 +1019,7 @@ void EpubReaderActivity::silentIndexNextChapterIfNeeded(const uint16_t viewportW
   if (!nextSection.createSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
                                      SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                      viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
-                                     SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0)) {
+                                     SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, SETTINGS.verticalText != 0, SETTINGS.convertToTraditional != 0)) {
     LOG_ERR("ERS", "Failed silent indexing for chapter: %d", nextSpineIndex);
   }
 }
