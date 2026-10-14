@@ -30,6 +30,10 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
     </label>
     <label>Name <input type="text" id="name" maxlength="20" placeholder="KEVIN CHUANG"></label>
     <label>Title <input type="text" id="title" maxlength="24" placeholder="BACKEND ENGINEER"></label>
+    <label>Orientation <select id="orient" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="portrait">Portrait 480x800 (sleep 方向 = PORTRAIT / INVERTED)</option>
+      <option value="landscape">Landscape 800x480 (sleep 方向 = LANDSCAPE_CCW / LANDSCAPE_CW)</option>
+    </select></label>
     <label>Layout <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
       <option value="classic">Classic (photo on top, text below)</option>
       <option value="badge">ID badge (black band, big name, code)</option>
@@ -2362,7 +2366,8 @@ var qrcode = function() {
 
 </script>
 <script>
-const W=480,H=800;
+let W=480,H=800;
+const M=28;                 // content margin shared by every layout
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 let photoImg=null;
 let photoDataUrl='';
@@ -2377,6 +2382,7 @@ function saveForm(){
     localStorage.setItem(LS_KEY, JSON.stringify({
       name:document.getElementById('name').value,
       title:document.getElementById('title').value,
+      orient:document.getElementById('orient').value,
       layout:document.getElementById('layout').value,
       showPhoto:document.getElementById('showPhoto').checked,
       headMain:document.getElementById('headMain').value,
@@ -2396,6 +2402,7 @@ function loadForm(){
   if(d){
     if(d.name) document.getElementById('name').value=d.name;
     if(d.title) document.getElementById('title').value=d.title;
+    if(d.orient) document.getElementById('orient').value=d.orient;
     if(d.layout){ document.getElementById('layout').value=d.layout; syncLayoutFields(); }
     if(d.showPhoto!==undefined) document.getElementById('showPhoto').checked=!!d.showPhoto;
     if(d.headMain) document.getElementById('headMain').value=d.headMain;
@@ -2434,6 +2441,7 @@ document.getElementById('codeType').onchange=()=>{saveForm();render();};
 document.getElementById('codeValue').oninput=()=>{saveForm();render();};
 document.getElementById('ditherCell').onchange=()=>{saveForm();render();};
 document.getElementById('layout').onchange=()=>{saveForm();syncLayoutFields();render();};
+document.getElementById('orient').onchange=()=>{saveForm();render();};
 document.getElementById('showPhoto').onchange=()=>{saveForm();render();};
 for(const id of ['headMain','headSub','agentId','division']) document.getElementById(id).oninput=()=>{saveForm();render();};
 function syncLayoutFields(){document.getElementById('badgeOnly').style.display=document.getElementById('layout').value==='badge'?'block':'none';}
@@ -2447,9 +2455,20 @@ const CODE39_PATTERNS=[20957,29783,23639,30485,20951,29813,23669,20855,29789,236
   22343,30161,24017,21959,30065,23921,22385,29015,18263,29141,17879,29045,18293,
   17783,29021,18269,17477,17489,17681,20753,35770];
 
+function applyOrientation(){
+  const landscape = document.getElementById('orient').value==='landscape';
+  const w = landscape?800:480, h = landscape?480:800;
+  if(W!==w || H!==h){ W=w; H=h; cv.width=w; cv.height=h; }
+}
 function render(){
+  applyOrientation();
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  if(document.getElementById('layout').value==='badge'){ renderBadgeLayout(); return; }
+  const layout=document.getElementById('layout').value;
+  if(document.getElementById('orient').value==='landscape'){
+    if(layout==='classic') renderLandscapeClassic(); else renderLandscapeBadge();
+    return;
+  }
+  if(layout==='badge'){ renderBadgeLayout(); return; }
 
   // --- photo (middle): the ONLY dithered element ---
   // Layout depends on what goes at the bottom: a square QR wants more height, so
@@ -2806,6 +2825,121 @@ function drawQrBrackets(x,y,size){
 }
 
 // 10px black / 10px white at 45 degrees, filling the last FOOT px of the panel.
+
+// ===========================================================================
+// Landscape layouts. The canvas is 800x480 and maps 1:1 onto the panel when the
+// sleep screen orientation is set to a LANDSCAPE_* value.
+// ===========================================================================
+function renderLandscapeBadge(){
+  const g=id=>document.getElementById(id);
+  const name=(g('name').value||'').trim();
+  const title=(g('title').value||'').trim();
+  const agentId=(g('agentId').value||'').trim();
+  const division=(g('division').value||'').trim();
+  const codeType=g('codeType').value;
+  const codeValue=(g('codeValue').value||'').trim();
+  const status=g('carrierStatus');
+  const CJK='"PingFang TC","Noto Sans TC",sans-serif';
+  const FOOT=16, spine=250;
+
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,spine,H-FOOT);
+  const headMain=(g('headMain').value||'').trim();
+  if(headMain){
+    ctx.fillStyle='#fff'; drawFit(headMain, M, 96, spine-2*M, 56, '700','left');
+  }else if(logoImg.complete&&logoImg.naturalWidth){
+    const w=spine-2*M, h=Math.round(logoImg.naturalHeight*w/logoImg.naturalWidth);
+    ctx.fillStyle='#fff'; ctx.fillRect(M,60,w,h);
+    ctx.drawImage(logoImg,M,60,w,h);
+    reverseInPlace(M,60,w,h);
+  }
+  ctx.fillStyle='#fff'; ctx.font='700 12px '+CJK; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  drawTracked((g('headSub').value||'').trim()||'STAFF IDENTIFICATION', M, 176, 2, 'left');
+
+  const rx0=spine+30, rx1=W-M;
+  ctx.fillStyle='#000'; ctx.font='600 14px '+CJK; ctx.textAlign='left';
+  if(agentId) ctx.fillText('EMPLOYEE ID  '+agentId, rx0, 44);
+  ctx.textAlign='right'; ctx.fillText('ACTIVE', rx1, 44);
+  ctx.fillRect(rx0,66,rx1-rx0,2);
+
+  ctx.fillStyle='#000'; ctx.textAlign='center';
+  if(name) drawFit(name, (rx0+rx1)/2, 170, rx1-rx0, 100, '700');
+  if(division){ ctx.fillStyle='#000'; ctx.font='500 12px '+CJK; ctx.textAlign='center';
+                drawTracked(division,(rx0+rx1)/2,204,4.5,'center'); }
+
+  ctx.fillStyle='#000'; ctx.fillRect(rx0,232,rx1-rx0,2);
+  ctx.font='600 14px '+CJK; ctx.textAlign='left'; ctx.fillText('TITLE', rx0, 270);
+  const chipText=title||'—';
+  let cf=18; do{ ctx.font='600 '+cf+'px '+CJK; if(ctx.measureText(chipText).width<=(rx1-rx0)-120) break; cf-=1; }while(cf>10);
+  const cw=Math.max(128, Math.min((rx1-rx0)-120, Math.ceil(ctx.measureText(chipText).width)+28));
+  const cx0=rx1-cw;
+  ctx.fillStyle='#000'; ctx.fillRect(cx0,246,cw,46);
+  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(chipText, cx0+cw/2, 271);
+  ctx.fillStyle='#000'; ctx.fillRect(rx0,310,rx1-rx0,2);
+
+  if(codeType==='qr' && codeValue){
+    const qs=140, qx=rx1-16-qs, qy=300, bx=qx-11, by=qy-11, bs=162;
+    ctx.fillStyle='#fff'; ctx.fillRect(qx-4,qy-4,qs+8,qs+8);
+    drawQr(codeValue, qx, qy, qs);
+    drawQrBrackets(bx,by,bs);
+    ctx.fillStyle='#000'; ctx.font='600 12px '+CJK; ctx.textAlign='right';
+    ctx.fillText(codeValue, bx-14, qy+70);
+    status.textContent='QR Code：'+codeValue;
+  }else if(codeType==='barcode' && codeValue){
+    const v=codeValue.toUpperCase();
+    if(!/^\/[A-Z0-9]{7}$/.test(v) && !/^[0-9A-Z.\- $/+%]+$/.test(v)){
+      status.textContent='一維碼只支援 0-9 A-Z 與 - . 空白 $ / + %。';
+    }else{
+      status.textContent='一維碼：'+v;   // the payload is NOT printed under the symbol
+      drawCode39(v, rx0, 330, rx1-rx0, 130);
+    }
+  }else{
+    status.textContent = codeType==='none' ? '不顯示條碼。' : '填入內容才會顯示條碼／QR Code。';
+  }
+  hatchFooter();
+  solidifyRegion(0,0,W,H,200);
+}
+
+function renderLandscapeClassic(){
+  const g=id=>document.getElementById(id);
+  const name=(g('name').value||'').trim();
+  const title=(g('title').value||'').trim();
+  const agentId=(g('agentId').value||'').trim();
+  const division=(g('division').value||'').trim();
+  const codeType=g('codeType').value;
+  const codeValue=(g('codeValue').value||'').trim();
+  const CJK='"PingFang TC","Noto Sans TC",sans-serif';
+  const pw=380, ph=H-16;
+
+  if(photoImg && g('showPhoto').checked){
+    drawCover(photoImg,0,0,pw,ph,0);
+    ditherRegion(0,0,pw,ph, parseInt(g('ditherCell').value||'2',10));
+  }else{
+    ctx.strokeStyle='#bbb'; ctx.lineWidth=2; ctx.strokeRect(1,1,pw-2,ph-2);
+    ctx.fillStyle='#bbb'; ctx.font='500 20px '+CJK; ctx.textAlign='center';
+    ctx.fillText('尚未上傳照片', pw/2, ph/2);
+  }
+
+  const x0=404, x1=W-M;
+  ctx.fillStyle='#000'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  if(name) drawFit(name, x0, 96, x1-x0, 78, '700', 'left');
+  if(title) drawFit(title, x0, 142, x1-x0, 34, '400', 'left');
+  if(division){ ctx.fillStyle='#000'; ctx.font='500 12px '+CJK; ctx.textAlign='left';
+                drawTracked(division, x0, 176, 3, 'left'); }
+  ctx.fillStyle='#000'; ctx.font='600 14px '+CJK; ctx.textAlign='left';
+  if(agentId) ctx.fillText('EMPLOYEE ID  '+agentId, x0, 208);
+  ctx.fillRect(x0,226,x1-x0,2);
+
+  if(codeType==='qr' && codeValue){
+    drawQr(codeValue, (x0+x1)/2-70, 250, 140);
+    ctx.fillStyle='#000'; ctx.font='600 12px '+CJK; ctx.textAlign='center';
+  }else if(codeType==='barcode' && codeValue){
+    const v=codeValue.toUpperCase();
+    if(/^\/[A-Z0-9]{7}$/.test(v) || /^[0-9A-Z.\- $/+%]+$/.test(v)) drawCode39(v, x0, 262, x1-x0, 110);
+  }
+  hatchFooter();
+  solidifyRegion(0,0,W,H,200);
+}
+
 function hatchFooter(){
   const FOOT=16, top=H-FOOT, step=10;
   ctx.fillStyle='#fff'; ctx.fillRect(0,top,W,FOOT);
@@ -2819,7 +2953,7 @@ function hatchFooter(){
 }
 
 function makeBmp(){
-  const rowBytes=60; // 480 px / 8 = 60, already 4-byte aligned
+  const rowBytes=Math.ceil(W/8)*4/4; // W is a multiple of 8 in both modes
   const dataSize=rowBytes*H, fileSize=14+40+8+dataSize;
   const buf=new ArrayBuffer(fileSize), dv=new DataView(buf), u8=new Uint8Array(buf);
   dv.setUint16(0,0x4D42,true); dv.setUint32(2,fileSize,true); dv.setUint32(10,62,true);
@@ -2832,7 +2966,7 @@ function makeBmp(){
   for(let row=H-1;row>=0;row--){            // BMP is bottom-up
     for(let bx=0;bx<rowBytes;bx++){
       let byte=0;
-      for(let b=0;b<8;b++){ const x=bx*8+b; const i=(row*W+x)*4; const bit=img[i]<128?0:1; byte|=(bit<<(7-b)); }
+      for(let b=0;b<8;b++){ const x=bx*8+b; const bit=(x<W && img[(row*W+x)*4]<128)?0:1; byte|=(bit<<(7-b)); }
       u8[p++]=byte;
     }
   }
