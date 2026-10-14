@@ -31,8 +31,10 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
     <label>姓名 <input type="text" id="name" maxlength="20" placeholder="KEVIN CHUANG"></label>
     <label>職稱 <input type="text" id="title" maxlength="24" placeholder="BACKEND ENGINEER"></label>
     <label>呈現方向 <select id="orient" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="portrait">直式 480×800（裝置方向：PORTRAIT / INVERTED）</option>
-      <option value="landscape">橫式 800×480（裝置方向：LANDSCAPE_CCW / LANDSCAPE_CW）</option>
+      <option value="portrait">直向 480×800（裝置方向＝直向）</option>
+      <option value="portrait180">直向 180° 480×800（裝置方向＝直向 180°）</option>
+      <option value="landscape">橫向 800×480（裝置方向＝橫向）</option>
+      <option value="landscape180">橫向 180° 800×480（裝置方向＝橫向 180°）</option>
     </select></label>
     <label>版面 <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
       <option value="classic">經典（照片在上、文字在下）</option>
@@ -2463,19 +2465,32 @@ const CODE39_PATTERNS=[20957,29783,23639,30485,20951,29813,23669,20855,29789,236
   17783,29021,18269,17477,17489,17681,20753,35770];
 
 function applyOrientation(){
-  const landscape = document.getElementById('orient').value==='landscape';
+  const v=document.getElementById('orient').value;
+  const landscape = (v==='landscape'||v==='landscape180');
   const w = landscape?800:480, h = landscape?480:800;
   if(W!==w || H!==h){ W=w; H=h; cv.width=w; cv.height=h; }
+}
+// The 180-degree variants export the design already turned over, so what the page
+// shows is exactly what the panel shows when the device's 方向 matches this entry.
+function orientationNeeds180(){ const v=document.getElementById('orient').value; return v==='portrait180'||v==='landscape180'; }
+function rotateCanvas180(){
+  const img=ctx.getImageData(0,0,W,H), d=img.data, out=ctx.createImageData(W,H), o=out.data;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const s=((H-1-y)*W+(W-1-x))*4, t=(y*W+x)*4;
+    o[t]=d[s]; o[t+1]=d[s+1]; o[t+2]=d[s+2]; o[t+3]=d[s+3];
+  }
+  ctx.putImageData(out,0,0);
 }
 function render(){
   applyOrientation();
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
   const layout=document.getElementById('layout').value;
-  if(document.getElementById('orient').value==='landscape'){
+  if(document.getElementById('orient').value==='landscape'||document.getElementById('orient').value==='landscape180'){
     if(layout==='classic') renderLandscapeClassic(); else renderLandscapeBadge();
+    if(orientationNeeds180()) rotateCanvas180();
     return;
   }
-  if(layout==='badge'){ renderBadgeLayout(); return; }
+  if(layout==='badge'){ renderBadgeLayout(); if(orientationNeeds180()) rotateCanvas180(); return; }
 
   // --- photo (middle): the ONLY dithered element ---
   // Layout depends on what goes at the bottom: a square QR wants more height, so
@@ -2532,6 +2547,7 @@ function render(){
 
   // Final pass: force every remaining colour to pure black/white by luminance.
   solidifyRegion(0,0,W,H,200);
+  if(orientationNeeds180()) rotateCanvas180();
 }
 
 function drawQr(text,x,y,size){
