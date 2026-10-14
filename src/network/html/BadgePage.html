@@ -21,46 +21,46 @@ canvas{width:auto;max-width:100%;border:1px solid #E7DDD0;border-radius:8px;back
 #status:empty{display:none}
 </style>
 <div class="wrap">
-  <div class="card"><h3>Badge builder (portrait 480x800)</h3>
-    <p class="small">Fill the fields, pick a layout and a code, then save to the device and set 休眠屏幕 = 名牌. Latin text stays crisp on this panel; small CJK glyphs come out muddy, so prefer English.</p></div>
+  <div class="card"><h3>名牌製作</h3>
+    <p class="small">填欄位 → 選版面與條碼 → <b>存到裝置</b>。裝置端：<b>設定 → 顯示 → 休眠屏幕 = 名牌</b>，並把<b>方向</b>設成對應的直式／橫式。<br>名牌上的固定文字用英文（這片面板英文才清楚）。</p></div>
   <div class="card">
-    <label>Photo <input type="file" id="photo" accept="image/*"></label>
-    <label style="flex-direction:row;align-items:center;gap:10px">Show photo
+    <label>照片 <input type="file" id="photo" accept="image/*"></label>
+    <label style="flex-direction:row;align-items:center;gap:10px">顯示照片
       <input type="checkbox" id="showPhoto" checked style="width:20px;height:20px">
     </label>
-    <label>Name <input type="text" id="name" maxlength="20" placeholder="KEVIN CHUANG"></label>
-    <label>Title <input type="text" id="title" maxlength="24" placeholder="BACKEND ENGINEER"></label>
-    <label>Orientation <select id="orient" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="portrait">Portrait 480x800 (sleep 方向 = PORTRAIT / INVERTED)</option>
-      <option value="landscape">Landscape 800x480 (sleep 方向 = LANDSCAPE_CCW / LANDSCAPE_CW)</option>
+    <label>姓名 <input type="text" id="name" maxlength="20" placeholder="KEVIN CHUANG"></label>
+    <label>職稱 <input type="text" id="title" maxlength="24" placeholder="BACKEND ENGINEER"></label>
+    <label>呈現方向 <select id="orient" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="portrait">直式 480×800（裝置方向：PORTRAIT / INVERTED）</option>
+      <option value="landscape">橫式 800×480（裝置方向：LANDSCAPE_CCW / LANDSCAPE_CW）</option>
     </select></label>
-    <label>Layout <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="classic">Classic (photo on top, text below)</option>
-      <option value="badge">ID badge (black band, big name, code)</option>
+    <label>版面 <select id="layout" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="classic">經典（照片在上、文字在下）</option>
+      <option value="badge">工牌（黑底標題列＋大名字＋條碼）</option>
     </select></label>
     <div id="badgeOnly" style="display:none">
-      <label>Header wordmark (blank = SARA logo) <input type="text" id="headMain" maxlength="14" placeholder="e.g. INTERAGENT" spellcheck="false"></label>
-      <label>Header subtitle <input type="text" id="headSub" maxlength="30" placeholder="STAFF IDENTIFICATION" spellcheck="false"></label>
-      <label>Employee ID <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
-      <label>Division <input type="text" id="division" maxlength="40" placeholder="INFORMATION TECHNOLOGY" spellcheck="false"></label>
+      <label>標題列主字（不填＝SARA 字標） <input type="text" id="headMain" maxlength="14" placeholder="e.g. INTERAGENT" spellcheck="false"></label>
+      <label>標題列副字 <input type="text" id="headSub" maxlength="30" placeholder="STAFF IDENTIFICATION" spellcheck="false"></label>
+      <label>員工編號 <input type="text" id="agentId" maxlength="20" placeholder="SR-D9AC" spellcheck="false"></label>
+      <label>部門 <input type="text" id="division" maxlength="40" placeholder="INFORMATION TECHNOLOGY" spellcheck="false"></label>
     </div>
-    <label>Code type <select id="codeType" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="barcode">1D barcode (Code 39)</option>
+    <label>條碼類型 <select id="codeType" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="barcode">一維碼（Code 39）</option>
       <option value="qr">QR Code</option>
-      <option value="none">None</option>
+      <option value="none">不顯示</option>
     </select></label>
-    <label>Content (carrier number or URL) <input type="text" id="codeValue" maxlength="120" placeholder="/SM6OLEQ or https://..." spellcheck="false"></label>
-    <label>Photo dither grain <select id="ditherCell" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
-      <option value="1">fine 1px (not recommended, muddies)</option>
-      <option value="2" selected>medium 2px (suggested)</option>
-      <option value="3">coarse 3px</option>
+    <label>內容（載具號碼或網址） <input type="text" id="codeValue" maxlength="120" placeholder="/SM6OLEQ or https://..." spellcheck="false"></label>
+    <label>照片抖色顆粒 <select id="ditherCell" style="font:inherit;font-size:16px;padding:8px 12px;border:1px solid #E7DDD0;border-radius:10px;background:#FFF7ED;width:100%">
+      <option value="1">細 1px（不建議，會糊）</option>
+      <option value="2" selected>中 2px（建議）</option>
+      <option value="3">粗 3px</option>
     </select></label>
-    <p id="carrierStatus" class="small">Code 39 wants / plus 7 characters; QR Code takes any URL or text.</p>
+    <p id="carrierStatus" class="small">一維碼請填 / 開頭 8 碼載具號；QR Code 可填任意網址或文字。</p>
   </div>
   <div class="card">
     <div class="preview"><canvas id="cv" width="480" height="800"></canvas></div>
-    <div class="row"><button id="render">Preview</button><button id="save" class="primary">Save to device</button></div>
-    <p class="small">Saved to <b>/.crosspoint/badge.bmp</b>. On the device: <b>Settings → Display → Sleep screen → 名牌 (Nameplate)</b>.</p>
+    <div class="row"><button id="render">重新預覽</button><button id="save" class="primary">存到裝置（待機名牌）</button></div>
+    <p class="small">存檔位置：<b>/.crosspoint/badge.bmp</b>（設定值另存 <b>badge.json</b>，換瀏覽器也還在）。</p>
     <p id="status" class="small"></p>
   </div>
 </div>
@@ -2377,47 +2377,54 @@ const logoImg=document.getElementById('logoImg');
 // Text fields are stored as-is; the photo is stored as a downscaled JPEG data
 // URL so it fits comfortably in localStorage.
 const LS_KEY='crosspoint.badge.form.v1';
+function formSnapshot(){
+  return {
+    name:document.getElementById('name').value,
+    title:document.getElementById('title').value,
+    orient:document.getElementById('orient').value,
+    layout:document.getElementById('layout').value,
+    showPhoto:document.getElementById('showPhoto').checked,
+    headMain:document.getElementById('headMain').value,
+    headSub:document.getElementById('headSub').value,
+    agentId:document.getElementById('agentId').value,
+    division:document.getElementById('division').value,
+    codeType:document.getElementById('codeType').value,
+    codeValue:document.getElementById('codeValue').value,
+    ditherCell:document.getElementById('ditherCell').value,
+    photo:photoDataUrl
+  };
+}
 function saveForm(){
-  try{
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      name:document.getElementById('name').value,
-      title:document.getElementById('title').value,
-      orient:document.getElementById('orient').value,
-      layout:document.getElementById('layout').value,
-      showPhoto:document.getElementById('showPhoto').checked,
-      headMain:document.getElementById('headMain').value,
-      headSub:document.getElementById('headSub').value,
-      agentId:document.getElementById('agentId').value,
-      division:document.getElementById('division').value,
-      codeType:document.getElementById('codeType').value,
-      codeValue:document.getElementById('codeValue').value,
-      ditherCell:document.getElementById('ditherCell').value,
-      photo:photoDataUrl
-    }));
-  }catch(e){}
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(formSnapshot())); }catch(e){}
+}
+function applyFormData(d){
+  if(!d) return;
+  const put=(id,v)=>{ if(v!==undefined && v!==null && v!=='') document.getElementById(id).value=v; };
+  put('name',d.name); put('title',d.title); put('orient',d.orient);
+  if(d.layout){ document.getElementById('layout').value=d.layout; syncLayoutFields(); }
+  if(d.showPhoto!==undefined) document.getElementById('showPhoto').checked=!!d.showPhoto;
+  put('headMain',d.headMain); put('headSub',d.headSub); put('agentId',d.agentId);
+  put('division',d.division); put('codeType',d.codeType); put('codeValue',d.codeValue);
+  put('ditherCell',d.ditherCell);
+  if(d.photo){ photoDataUrl=d.photo; const im=new Image(); im.onload=()=>{photoImg=im;render();}; im.src=d.photo; }
 }
 function loadForm(){
   let d=null;
   try{ d=JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){}
-  if(d){
-    if(d.name) document.getElementById('name').value=d.name;
-    if(d.title) document.getElementById('title').value=d.title;
-    if(d.orient) document.getElementById('orient').value=d.orient;
-    if(d.layout){ document.getElementById('layout').value=d.layout; syncLayoutFields(); }
-    if(d.showPhoto!==undefined) document.getElementById('showPhoto').checked=!!d.showPhoto;
-    if(d.headMain) document.getElementById('headMain').value=d.headMain;
-    if(d.headSub) document.getElementById('headSub').value=d.headSub;
-    if(d.agentId) document.getElementById('agentId').value=d.agentId;
-    if(d.division) document.getElementById('division').value=d.division;
-    if(d.codeType) document.getElementById('codeType').value=d.codeType;
-    if(d.codeValue) document.getElementById('codeValue').value=d.codeValue;
-    if(d.ditherCell) document.getElementById('ditherCell').value=d.ditherCell;
-    if(d.photo){
-      photoDataUrl=d.photo;
-      const im=new Image(); im.onload=()=>{photoImg=im;render();}; im.src=d.photo;
-    }
-  }
+  applyFormData(d);
   render();
+}
+// The form is also kept ON THE DEVICE (/.crosspoint/badge.json). localStorage is
+// per browser and per origin, so it is empty in a private window and lost when the
+// device's IP changes; the device copy survives all of that.
+async function loadFromDevice(){
+  try{
+    const r=await fetch('/download?path=/.crosspoint/badge.json',{cache:'no-store'});
+    if(!r.ok) return;
+    const d=await r.json();
+    applyFormData(d); saveForm(); render();
+    setStatus('已從裝置載入上次的表單 ✔');
+  }catch(e){}
 }
 // 600px is plenty for the 360px photo slot and keeps the stored copy small.
 function shrinkToDataUrl(img){
@@ -2768,7 +2775,8 @@ function renderBadgeLayout(){
   }
 
   // --- payload caption (752..765) and hatched footer (784..799) ---------
-  if(codeValue && !(showPhoto&&photoImg)){
+  // Only a QR keeps its caption; a 1D symbol's digits are not printed.
+  if(codeValue && codeType==='qr' && !(showPhoto&&photoImg)){
     ctx.fillStyle='#000'; ctx.font='700 13px '+CJK; ctx.textAlign='center';
     ctx.fillText(codeValue, W/2, 763);
   }
@@ -2975,13 +2983,19 @@ function makeBmp(){
 
 async function save(){
   render();
-  const fd=new FormData();
-  fd.append('file', makeBmp(), 'badge.bmp');
   setStatus('上傳中…');
   try{
+    const fd=new FormData();
+    fd.append('file', makeBmp(), 'badge.bmp');
     const r=await fetch('/upload?path=/.crosspoint',{method:'POST',body:fd});
     if(!r.ok) throw new Error(await r.text());
-    setStatus('已存到 /.crosspoint/badge.bmp ✔ 到裝置設定選「名牌」即可。');
+    // Also persist the form on the device, so the fields come back on any browser.
+    try{
+      const jd=new FormData();
+      jd.append('file', new Blob([JSON.stringify(formSnapshot())],{type:'application/json'}), 'badge.json');
+      await fetch('/upload?path=/.crosspoint',{method:'POST',body:jd});
+    }catch(e){}
+    setStatus('已存到 /.crosspoint/badge.bmp ✔（表單也存成 badge.json）。到裝置設定選「名牌」即可。');
   }catch(e){ setStatus('上傳失敗：'+e.message); }
 }
 function setStatus(t){document.getElementById('status').textContent=t;}
@@ -2994,5 +3008,6 @@ logoImg.onerror=render;
 // threw a TDZ ReferenceError that silently killed both the preview and save().
 loadForm();
 if(logoImg.complete) render(); else render();
+loadFromDevice();
 </script>
 </html>
