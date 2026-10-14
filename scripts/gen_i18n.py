@@ -557,9 +557,13 @@ def generate_keys_header(
         "EN", "ES", "FR", "DE", "CS", "PT", "RU", "SV", "RO", "CA", "UK",
         "BE", "IT", "PL", "FI", "DA", "NL", "TR", "KK", "HU", "LT", "SI",
     ]
+    # Languages dropped from the build are mapped to EN so the table keeps its
+    # length and old on-disk indices still resolve to a language that exists.
+    present = set(languages)
     lines.append("// V1 language.bin migration table (frozen enum order from 2f969a9)")
+    lines.append("// Languages no longer built map to EN so the length is unchanged.")
     lines.append("constexpr Language V1_LANGUAGES[] = {")
-    lines.append("    " + ", ".join(f"Language::{c}" for c in v1_codes) + ",")
+    lines.append("    " + ", ".join(f"Language::{c}" if c in present else "Language::EN" for c in v1_codes) + ",")
     lines.append("};")
     lines.append(
         f"constexpr uint8_t V1_LANGUAGE_COUNT = {len(v1_codes)};"

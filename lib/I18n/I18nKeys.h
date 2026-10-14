@@ -8,58 +8,6 @@
 namespace i18n_strings {
 extern const char STRINGS_EN_DATA[];
 extern const uint16_t OFFSETS_EN[];
-extern const char STRINGS_ES_DATA[];
-extern const uint16_t OFFSETS_ES[];
-extern const char STRINGS_FR_DATA[];
-extern const uint16_t OFFSETS_FR[];
-extern const char STRINGS_DE_DATA[];
-extern const uint16_t OFFSETS_DE[];
-extern const char STRINGS_CS_DATA[];
-extern const uint16_t OFFSETS_CS[];
-extern const char STRINGS_PT_DATA[];
-extern const uint16_t OFFSETS_PT[];
-extern const char STRINGS_RU_DATA[];
-extern const uint16_t OFFSETS_RU[];
-extern const char STRINGS_SV_DATA[];
-extern const uint16_t OFFSETS_SV[];
-extern const char STRINGS_RO_DATA[];
-extern const uint16_t OFFSETS_RO[];
-extern const char STRINGS_CA_DATA[];
-extern const uint16_t OFFSETS_CA[];
-extern const char STRINGS_UK_DATA[];
-extern const uint16_t OFFSETS_UK[];
-extern const char STRINGS_BE_DATA[];
-extern const uint16_t OFFSETS_BE[];
-extern const char STRINGS_IT_DATA[];
-extern const uint16_t OFFSETS_IT[];
-extern const char STRINGS_PL_DATA[];
-extern const uint16_t OFFSETS_PL[];
-extern const char STRINGS_FI_DATA[];
-extern const uint16_t OFFSETS_FI[];
-extern const char STRINGS_DA_DATA[];
-extern const uint16_t OFFSETS_DA[];
-extern const char STRINGS_NL_DATA[];
-extern const uint16_t OFFSETS_NL[];
-extern const char STRINGS_TR_DATA[];
-extern const uint16_t OFFSETS_TR[];
-extern const char STRINGS_KK_DATA[];
-extern const uint16_t OFFSETS_KK[];
-extern const char STRINGS_HU_DATA[];
-extern const uint16_t OFFSETS_HU[];
-extern const char STRINGS_LT_DATA[];
-extern const uint16_t OFFSETS_LT[];
-extern const char STRINGS_SI_DATA[];
-extern const uint16_t OFFSETS_SI[];
-extern const char STRINGS_CAV_DATA[];
-extern const uint16_t OFFSETS_CAV[];
-extern const char STRINGS_HE_DATA[];
-extern const uint16_t OFFSETS_HE[];
-extern const char STRINGS_SK_DATA[];
-extern const uint16_t OFFSETS_SK[];
-extern const char STRINGS_VI_DATA[];
-extern const uint16_t OFFSETS_VI[];
-extern const char STRINGS_ZH_HANS_DATA[];
-extern const uint16_t OFFSETS_ZH_HANS[];
 extern const char STRINGS_ZH_HANT_DATA[];
 extern const uint16_t OFFSETS_ZH_HANT[];
 }  // namespace i18n_strings
@@ -67,33 +15,7 @@ extern const uint16_t OFFSETS_ZH_HANT[];
 // Language enum
 enum class Language : uint8_t {
   EN = 0,
-  ES = 1,
-  FR = 2,
-  DE = 3,
-  CS = 4,
-  PT = 5,
-  RU = 6,
-  SV = 7,
-  RO = 8,
-  CA = 9,
-  UK = 10,
-  BE = 11,
-  IT = 12,
-  PL = 13,
-  FI = 14,
-  DA = 15,
-  NL = 16,
-  TR = 17,
-  KK = 18,
-  HU = 19,
-  LT = 20,
-  SI = 21,
-  CAV = 22,
-  HE = 23,
-  SK = 24,
-  VI = 25,
-  ZH_HANS = 26,
-  ZH_HANT = 27,
+  ZH_HANT = 1,
   _COUNT
 };
 
@@ -535,58 +457,6 @@ inline LangStrings getLanguageStrings(Language lang) {
   switch (lang) {
     case Language::EN:
       return {i18n_strings::STRINGS_EN_DATA, i18n_strings::OFFSETS_EN};
-    case Language::ES:
-      return {i18n_strings::STRINGS_ES_DATA, i18n_strings::OFFSETS_ES};
-    case Language::FR:
-      return {i18n_strings::STRINGS_FR_DATA, i18n_strings::OFFSETS_FR};
-    case Language::DE:
-      return {i18n_strings::STRINGS_DE_DATA, i18n_strings::OFFSETS_DE};
-    case Language::CS:
-      return {i18n_strings::STRINGS_CS_DATA, i18n_strings::OFFSETS_CS};
-    case Language::PT:
-      return {i18n_strings::STRINGS_PT_DATA, i18n_strings::OFFSETS_PT};
-    case Language::RU:
-      return {i18n_strings::STRINGS_RU_DATA, i18n_strings::OFFSETS_RU};
-    case Language::SV:
-      return {i18n_strings::STRINGS_SV_DATA, i18n_strings::OFFSETS_SV};
-    case Language::RO:
-      return {i18n_strings::STRINGS_RO_DATA, i18n_strings::OFFSETS_RO};
-    case Language::CA:
-      return {i18n_strings::STRINGS_CA_DATA, i18n_strings::OFFSETS_CA};
-    case Language::UK:
-      return {i18n_strings::STRINGS_UK_DATA, i18n_strings::OFFSETS_UK};
-    case Language::BE:
-      return {i18n_strings::STRINGS_BE_DATA, i18n_strings::OFFSETS_BE};
-    case Language::IT:
-      return {i18n_strings::STRINGS_IT_DATA, i18n_strings::OFFSETS_IT};
-    case Language::PL:
-      return {i18n_strings::STRINGS_PL_DATA, i18n_strings::OFFSETS_PL};
-    case Language::FI:
-      return {i18n_strings::STRINGS_FI_DATA, i18n_strings::OFFSETS_FI};
-    case Language::DA:
-      return {i18n_strings::STRINGS_DA_DATA, i18n_strings::OFFSETS_DA};
-    case Language::NL:
-      return {i18n_strings::STRINGS_NL_DATA, i18n_strings::OFFSETS_NL};
-    case Language::TR:
-      return {i18n_strings::STRINGS_TR_DATA, i18n_strings::OFFSETS_TR};
-    case Language::KK:
-      return {i18n_strings::STRINGS_KK_DATA, i18n_strings::OFFSETS_KK};
-    case Language::HU:
-      return {i18n_strings::STRINGS_HU_DATA, i18n_strings::OFFSETS_HU};
-    case Language::LT:
-      return {i18n_strings::STRINGS_LT_DATA, i18n_strings::OFFSETS_LT};
-    case Language::SI:
-      return {i18n_strings::STRINGS_SI_DATA, i18n_strings::OFFSETS_SI};
-    case Language::CAV:
-      return {i18n_strings::STRINGS_CAV_DATA, i18n_strings::OFFSETS_CAV};
-    case Language::HE:
-      return {i18n_strings::STRINGS_HE_DATA, i18n_strings::OFFSETS_HE};
-    case Language::SK:
-      return {i18n_strings::STRINGS_SK_DATA, i18n_strings::OFFSETS_SK};
-    case Language::VI:
-      return {i18n_strings::STRINGS_VI_DATA, i18n_strings::OFFSETS_VI};
-    case Language::ZH_HANS:
-      return {i18n_strings::STRINGS_ZH_HANS_DATA, i18n_strings::OFFSETS_ZH_HANS};
     case Language::ZH_HANT:
       return {i18n_strings::STRINGS_ZH_HANT_DATA, i18n_strings::OFFSETS_ZH_HANT};
     default:
@@ -599,40 +469,15 @@ constexpr uint8_t getLanguageCount() { return static_cast<uint8_t>(Language::_CO
 
 // Sorted language indices by code (auto-generated by gen_i18n.py)
 //    0: EN   English
-//    1: BE   Беларуская
-//    2: CA   Català
-//    3: CAV  Valencià
-//    4: CS   Čeština
-//    5: DA   Dansk
-//    6: DE   Deutsch
-//    7: ES   Español
-//    8: FI   Suomi
-//    9: FR   Français
-//   10: HE   עברית
-//   11: HU   Magyar
-//   12: IT   Italiano
-//   13: KK   Қазақша
-//   14: LT   Lietuvių
-//   15: NL   Nederlands
-//   16: PL   Polski
-//   17: PT   Português (Brasil)
-//   18: RO   Română
-//   19: RU   Русский
-//   20: SI   Slovenščina
-//   21: SK   Slovenčina
-//   22: SV   Svenska
-//   23: TR   Türkçe
-//   24: UK   Українська
-//   25: VI   Tiếng Việt
-//   26: ZH_HANS 简体中文
-//   27: ZH_HANT 繁體中文
-constexpr uint8_t SORTED_LANGUAGE_INDICES[] = {0, 11, 9, 22, 4, 15, 3, 1, 14, 2, 23, 19, 12, 18, 20, 16, 13, 5, 8, 6, 21, 24, 7, 17, 10, 25, 26, 27};
+//    1: ZH_HANT 繁體中文
+constexpr uint8_t SORTED_LANGUAGE_INDICES[] = {0, 1};
 
 static_assert(sizeof(SORTED_LANGUAGE_INDICES) / sizeof(SORTED_LANGUAGE_INDICES[0]) == getLanguageCount(),
               "SORTED_LANGUAGE_INDICES size mismatch");
 
 // V1 language.bin migration table (frozen enum order from 2f969a9)
+// Languages no longer built map to EN so the length is unchanged.
 constexpr Language V1_LANGUAGES[] = {
-    Language::EN, Language::ES, Language::FR, Language::DE, Language::CS, Language::PT, Language::RU, Language::SV, Language::RO, Language::CA, Language::UK, Language::BE, Language::IT, Language::PL, Language::FI, Language::DA, Language::NL, Language::TR, Language::KK, Language::HU, Language::LT, Language::SI,
+    Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN, Language::EN,
 };
 constexpr uint8_t V1_LANGUAGE_COUNT = 22;
