@@ -25,7 +25,6 @@
 #ifdef ONEPAGE_C61
 #include "bluetooth/BleHidHost.h"
 #endif
-#include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
@@ -488,7 +487,6 @@ void setup() {
     BLE_HID_HOST.start();
   }
 #endif
-  KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);

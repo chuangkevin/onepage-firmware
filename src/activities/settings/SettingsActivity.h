@@ -15,16 +15,11 @@ enum class SettingAction {
   None,
   RemapFrontButtons,
   CustomiseStatusBar,
-  KOReaderSync,
-  OPDSBrowser,
   Network,
   ClearCache,
   CheckForUpdates,
   SdFirmwareUpdate,
   Language,
-  DownloadFonts,
-  ReadflixDownload,
-  TailscaleLogin,
   BlePageTurner,
 };
 
