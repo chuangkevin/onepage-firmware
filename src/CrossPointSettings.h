@@ -209,6 +209,9 @@ class CrossPointSettings {
   // Text rendering settings
   uint8_t extraParagraphSpacing = 1;
   uint8_t textAntiAliasing = 1;
+  // Anti-alias the UI text too. Needs the grayscale refresh pass in
+  // ActivityManager::renderTaskLoop, which is slower, so it is opt-in.
+  uint8_t uiTextAa = 0;
   // Ruled lines: draw a dashed rule under each line of reader text (0=off, 1=on).
   // Purely visual render-time overlay — not baked into the section cache.
   uint8_t ruledLines = 0;

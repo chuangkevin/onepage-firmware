@@ -1,5 +1,7 @@
 #include "ActivityManager.h"
 
+#include <CrossPointSettings.h>
+
 #include <FontCacheManager.h>
 #include <HalPowerManager.h>
 
@@ -31,6 +33,47 @@ void ActivityManager::renderTaskTrampoline(void* param) {
   self->renderTaskLoop();
 }
 
+
+// Draw the current screen with anti-aliased text. The activity's draw is run once
+// for the 1-bit frame (its own refresh suppressed) and once per grayscale plane
+// into a strip buffer, then everything is pushed with a single grayscale refresh -
+// the same sequence the EPUB reader uses for a page, applied to UI screens.
+namespace {
+void renderWithTextAa(Activity& activity, RenderLock&& lock, GfxRenderer& renderer) {
+  constexpr int STRIP_ROWS = 80;
+  renderer.setSuppressDisplay(true);
+  activity.render(std::move(lock));  // 1-bit frame; the refresh is suppressed
+
+  const int gh = renderer.getDisplayHeight();
+  const int gwBytes = renderer.getDisplayWidthBytes();
+  auto* scratch = static_cast<uint8_t*>(malloc(static_cast<size_t>(gwBytes) * STRIP_ROWS));
+  if (scratch == nullptr) {
+    // Out of memory: fall back to the plain 1-bit frame instead of a blank screen.
+    renderer.setSuppressDisplay(false);
+    renderer.displayBuffer(renderer.lastRequestedRefreshMode());
+    return;
+  }
+
+  for (int plane = 0; plane < 2; ++plane) {
+    renderer.setRenderMode(plane == 0 ? GfxRenderer::GRAYSCALE_LSB : GfxRenderer::GRAYSCALE_MSB);
+    for (int y = 0; y < gh; y += STRIP_ROWS) {
+      const int rows = (gh - y < STRIP_ROWS) ? (gh - y) : STRIP_ROWS;
+      renderer.beginStripTarget(scratch, y, rows);
+      renderer.clearScreen(0x00);
+      activity.render(std::move(lock));
+      renderer.endStripTarget();
+      renderer.writeGrayscalePlaneStrip(plane == 0, scratch, y, rows);
+    }
+  }
+
+  renderer.setRenderMode(GfxRenderer::BW);
+  renderer.setSuppressDisplay(false);
+  renderer.displayGrayBuffer();
+  renderer.cleanupGrayscaleWithFrameBuffer();
+  free(scratch);
+}
+}  // namespace
+
 void ActivityManager::renderTaskLoop() {
   while (true) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -39,7 +82,11 @@ void ActivityManager::renderTaskLoop() {
     RenderLock lock;
     if (currentActivity) {
       HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
-      currentActivity->render(std::move(lock));
+      if (SETTINGS.uiTextAa != 0) {
+        renderWithTextAa(*currentActivity, std::move(lock), renderer);
+      } else {
+        currentActivity->render(std::move(lock));
+      }
     }
     // Notify any task blocked in requestUpdateAndWait() that the render is done.
     TaskHandle_t waiter = nullptr;

@@ -225,6 +225,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                             "extraParagraphSpacing", StrId::STR_CAT_READER),
         SettingInfo::Toggle(StrId::STR_TEXT_AA, &CrossPointSettings::textAntiAliasing, "textAntiAliasing",
                             StrId::STR_CAT_READER),
+        SettingInfo::Toggle(StrId::STR_UI_TEXT_AA, &CrossPointSettings::uiTextAa, "uiTextAa",
+                            StrId::STR_CAT_DISPLAY),
         SettingInfo::Toggle(StrId::STR_RULED_LINES, &CrossPointSettings::ruledLines, "ruledLines",
                             StrId::STR_CAT_READER),
         SettingInfo::Enum(StrId::STR_RULED_LINE_STYLE, &CrossPointSettings::ruledLineStyle,
