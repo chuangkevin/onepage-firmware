@@ -29,6 +29,9 @@ bool HalStorage::ready() const { return SDCard.ready(); }
 
 bool HalStorage::usingInternalStorage() const { return SDCard.usingInternalStorage(); }
 
+void HalStorage::suspendForPanelReset() { SDCard.suspendForPanelReset(); }
+bool HalStorage::resumeAfterPanelReset() { return SDCard.resumeAfterPanelReset(); }
+
 // For the rest of the methods, we acquire the mutex to ensure thread safety
 
 class HalStorage::StorageLock {

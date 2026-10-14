@@ -103,6 +103,15 @@ class EInkDisplay {
 
   void refreshDisplay(RefreshMode mode = FAST_REFRESH, bool turnOffScreen = false);
 
+  // Called around a panel power-cycle when BUSY has wedged. The card shares
+  // GPIO27 with the panel, so `suspend` de-asserts it and `resume` mounts it
+  // again; with no hooks installed the rail is left alone.
+  using PanelResetHook = void (*)();
+  void setPanelResetHooks(PanelResetHook suspend, PanelResetHook resume) {
+    _panelSuspend = suspend;
+    _panelResume = resume;
+  }
+
   // Hint the X3 policy to run a one-shot full resync on next update.
   void requestResync(uint8_t settlePasses = 0);
 
@@ -146,6 +155,8 @@ class EInkDisplay {
   // the controller did not finish the waveform. refreshDisplay uses it to
   // re-arm the panel instead of leaving it wedged for the next frame.
   bool _busyTimedOut = false;
+  PanelResetHook _panelSuspend = nullptr;
+  PanelResetHook _panelResume = nullptr;
   bool _x3RedRamSynced = false;
   struct X3GrayState {
     bool lastBaseWasPartial = false;

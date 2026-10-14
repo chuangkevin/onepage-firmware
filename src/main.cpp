@@ -329,6 +329,14 @@ void setup() {
 
   LOG_INF("MAIN", "Hardware detect: %s", gpio.deviceIsX3() ? "X3" : "X4");
 
+  // The panel and the SD card share GPIO27. When the EPD controller wedges, only
+  // a power-cycle of that rail clears it, so the display layer needs to be able to
+  // park the card first. Registered as plain function pointers to keep the SDK
+  // free of app dependencies.
+  display.setPanelResetHooks(
+      []() { Storage.suspendForPanelReset(); },
+      []() { Storage.resumeAfterPanelReset(); });
+
   // SD Card Initialization
   // We need 6 open files concurrently when parsing a new chapter
   if (!Storage.begin()) {

@@ -17,6 +17,10 @@ class HalStorage {
   bool ready() const;
   // True when no microSD was found and the internal-flash volume is in use.
   bool usingInternalStorage() const;
+  // Stop / restart the card so the shared EPD power rail can be pulsed (see
+  // SDCardManager::suspendForPanelReset).
+  void suspendForPanelReset();
+  bool resumeAfterPanelReset();
   std::vector<String> listFiles(const char* path = "/", int maxFiles = 200);
   // Read the entire file at `path` into a String. Returns empty string on failure.
   String readFile(const char* path);

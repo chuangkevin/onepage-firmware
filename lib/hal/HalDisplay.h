@@ -44,6 +44,10 @@ class HalDisplay {
   // Power management
   void deepSleep();
 
+  // Installed by main so the display layer can de-assert the SD card while it
+  // power-cycles the panel (they share GPIO27).
+  void setPanelResetHooks(EInkDisplay::PanelResetHook suspend, EInkDisplay::PanelResetHook resume);
+
 
   // Access to frame buffer
   uint8_t* getFrameBuffer() const;

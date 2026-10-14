@@ -527,3 +527,14 @@ bool SDCardManager::removeDir(const char* path) {
 
   return vol().rmdir(path);
 }
+
+void SDCardManager::suspendForPanelReset() {
+  if (usingInternal || !initialized) return;
+  sd.end();  // unmount volumes and stop the card
+  initialized = false;
+}
+
+bool SDCardManager::resumeAfterPanelReset() {
+  if (usingInternal) return true;
+  return begin();
+}

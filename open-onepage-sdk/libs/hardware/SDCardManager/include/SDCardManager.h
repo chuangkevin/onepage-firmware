@@ -64,6 +64,13 @@ class SDCardManager {
 
   static SDCardManager& getInstance() { return instance; }
 
+  // The EPD's reset/power rail (GPIO27) is shared with the card, so the panel
+  // cannot be power-cycled while a card is mounted. These two let the display
+  // layer borrow the rail: suspend() stops the card, resume() brings it back.
+  // Both are no-ops when the internal volume is in use.
+  void suspendForPanelReset();
+  bool resumeAfterPanelReset();
+
  private:
   static SDCardManager instance;
 

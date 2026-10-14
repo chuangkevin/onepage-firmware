@@ -1941,15 +1941,38 @@ void EInkDisplay::refreshDisplay(const RefreshMode mode,
   waitWhileBusy(refreshType, refreshTimeoutMs);
 
   if (_busyTimedOut) {
-    // BUSY never released: the controller is wedged, not merely slow. Nothing in
-    // software recovers it -- re-activating does not clear it, and a soft reset
-    // times out too (both measured on hardware). Only cycling the panel's power
-    // rail does, and that rail is shared with the SD card, so it cannot be pulsed
-    // without risking the card. Log it and carry on: retrying here just froze the
-    // UI for ~20 s per frame, which is what made the device look hung.
+    // BUSY never released: the controller is wedged, not merely slow. It does not
+    // clear on re-activation or on a soft reset (both measured timing out); only
+    // cycling its power rail does. On OnePage that rail is shared with the SD
+    // card, so the card is de-asserted first and re-mounted afterwards. Without
+    // the hooks installed the rail is left alone and the panel stays wedged.
     if (Serial)
-      Serial.printf("[%lu]   panel wedged: BUSY held past %lu ms; a power cycle is needed\n", millis(),
-                    refreshTimeoutMs);
+      Serial.printf("[%lu]   panel wedged: BUSY held past %lu ms; resetting the panel\n", millis(), refreshTimeoutMs);
+    if (_panelSuspend != nullptr && _panelResume != nullptr) {
+      _panelSuspend();
+      pinMode(_rst, OUTPUT);
+      digitalWrite(_rst, LOW);
+      delay(600);  // long enough for the EPD decoupling caps to discharge
+      digitalWrite(_rst, HIGH);
+      delay(120);
+      initDisplayController();
+      isScreenOn = false;  // force the analog rails back on for the retry
+      setRamArea(0, 0, displayWidth, displayHeight);
+      if (frameBuffer != nullptr) {
+        writeRamBuffer(CMD_WRITE_RAM_BW, frameBuffer, bufferSize);
+        writeRamBuffer(CMD_WRITE_RAM_RED, frameBuffer, bufferSize);
+      }
+      _panelResume();
+
+      sendCommand(CMD_WRITE_TEMP);
+      sendData(0x19);
+      sendCommand(CMD_DISPLAY_UPDATE_CTRL2);
+      sendData(static_cast<uint8_t>(displayMode | 0xC0));
+      sendCommand(CMD_MASTER_ACTIVATION);
+      waitWhileBusy(refreshType, refreshTimeoutMs);
+      if (Serial)
+        Serial.printf("[%lu]   panel reset %s\n", millis(), _busyTimedOut ? "failed" : "recovered");
+    }
   }
 }
 
