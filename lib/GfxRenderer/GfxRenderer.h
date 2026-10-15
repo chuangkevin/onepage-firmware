@@ -219,6 +219,16 @@ class GfxRenderer {
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,
                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  // Draw one codepoint rotated 90 degrees clockwise, centred inside a square cell
+  // of `cellSize` pixels whose top-left corner is (cellX, cellY). Used for vertical
+  // CJK punctuation (brackets/dashes/ellipsis) when the font has no vertical form.
+  void drawGlyphRotated90CW(int fontId, int cellX, int cellY, int cellSize, const char* utf8, bool black = true,
+                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  // Draw one codepoint centred by its INK (not its advance) inside a square cell of
+  // `cellSize` at (cellX, cellY). Sentence punctuation ink sits low-left in the em box,
+  // so centring by advance would leave it off-centre; this centres the visible ink.
+  void drawGlyphCentered(int fontId, int cellX, int cellY, int cellSize, const char* utf8, bool black = true,
+                         EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   int getTextHeight(int fontId) const;
 
   // Grayscale functions

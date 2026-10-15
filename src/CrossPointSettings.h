@@ -100,8 +100,11 @@ class CrossPointSettings {
   // Default: Up = Previous, Down = Next
   enum SIDE_BUTTON_LAYOUT { PREV_NEXT = 0, NEXT_PREV = 1, SIDE_BUTTONS_DISABLED = 2, SIDE_BUTTON_LAYOUT_COUNT };
 
-  // Font family options (built-in fonts only; SD card fonts use sdFontFamilyName)
-  enum FONT_FAMILY { NOTOSERIF = 0, NOTOSANS = 1, FONT_FAMILY_COUNT };
+  // Font family options (built-in fonts only; SD card fonts use sdFontFamilyName).
+  // Only Noto Serif ships as a built-in reader font (see lib/EpdFont/builtinFonts/all.h);
+  // Noto Sans was dropped from the build to save flash. The enum/count/selection list must
+  // stay in lockstep with that or the settings label maps to the wrong font (off-by-one).
+  enum FONT_FAMILY { NOTOSERIF = 0, FONT_FAMILY_COUNT };
   static constexpr uint8_t LEGACY_OPENDYSLEXIC = 2;
   static constexpr uint8_t BUILTIN_FONT_COUNT = FONT_FAMILY_COUNT;
   // Font size options

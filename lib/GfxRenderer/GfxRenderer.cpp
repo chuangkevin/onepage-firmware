@@ -149,7 +149,16 @@ static inline void rotateCoordinates(const GfxRenderer::Orientation orientation,
   }
 }
 
-enum class TextRotation { None, Rotated90CW };
+enum class TextRotation {
+  None,
+  // NOTE: despite the name, this maps ink (gx,gy) -> (gy,-gx), i.e. a 90-degree
+  // COUNTER-clockwise rotation. Left as-is because the side-button labels rely on
+  // its actual behaviour.
+  Rotated90CW,
+  // True 90-degree CLOCKWISE rotation: ink (gx,gy) -> (-gy,gx). This is the
+  // orientation vertical CJK punctuation needs (「 becomes the font's FE41 form).
+  Rotated90CWTrue,
+};
 
 // Shared glyph rendering logic for normal and rotated text.
 // Coordinate mapping and cursor advance direction are selected at compile time via the template parameter.
@@ -253,6 +262,10 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     if (!renderer.glyphIntersectsStrip(ob, ib - (width - 1), ob + height - 1, ib)) {
       return;
     }
+  } else if constexpr (rotation == TextRotation::Rotated90CWTrue) {
+    if (!renderer.glyphIntersectsStrip(cursorX - (height - 1), cursorY, cursorX, cursorY + width - 1)) {
+      return;
+    }
   } else {
     const int gx0 = cursorX + left;
     const int gy0 = cursorY - top;
@@ -270,6 +283,9 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     if constexpr (rotation == TextRotation::Rotated90CW) {
       outerBase = cursorX + fontData->ascender - top;  // screenX = outerBase + glyphY
       innerBase = cursorY - left;                      // screenY = innerBase - glyphX
+    } else if constexpr (rotation == TextRotation::Rotated90CWTrue) {
+      outerBase = cursorX;  // screenX = outerBase - glyphY
+      innerBase = cursorY;  // screenY = innerBase + glyphX
     } else {
       outerBase = cursorY - top;   // screenY = outerBase + glyphY
       innerBase = cursorX + left;  // screenX = innerBase + glyphX
@@ -284,6 +300,9 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
           if constexpr (rotation == TextRotation::Rotated90CW) {
             screenX = outerCoord;
             screenY = innerBase - glyphX;
+          } else if constexpr (rotation == TextRotation::Rotated90CWTrue) {
+            screenX = outerBase - glyphY;
+            screenY = innerBase + glyphX;
           } else {
             screenX = innerBase + glyphX;
             screenY = outerCoord;
@@ -319,6 +338,9 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
           if constexpr (rotation == TextRotation::Rotated90CW) {
             screenX = outerCoord;
             screenY = innerBase - glyphX;
+          } else if constexpr (rotation == TextRotation::Rotated90CWTrue) {
+            screenX = outerBase - glyphY;
+            screenY = innerBase + glyphX;
           } else {
             screenX = innerBase + glyphX;
             screenY = outerCoord;
@@ -1767,6 +1789,51 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
     prevCp = cp;
   }
+}
+
+void GfxRenderer::drawGlyphRotated90CW(const int fontId, const int cellX, const int cellY, const int cellSize,
+                                       const char* utf8, const bool black,
+                                       const EpdFontFamily::Style style) const {
+  if (utf8 == nullptr || *utf8 == '\0') return;
+  const auto fontIt = fontMap.find(fontId);
+  if (fontIt == fontMap.end()) {
+    LOG_ERR("GFX", "Font %d not found", fontId);
+    return;
+  }
+  const auto& font = fontIt->second;
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(utf8);
+  const uint32_t cp = utf8NextCodepoint(&p);
+  if (cp == 0) return;
+  const EpdGlyph* glyph = font.getGlyph(cp, style);
+  if (glyph == nullptr) return;
+
+  // Rotated90CWTrue mapping: screenX = cursorX - glyphY, screenY = cursorY + glyphX.
+  // Pick the cursor so the rotated ink is centred in the cell.
+  const int cursorX = cellX + (cellSize - glyph->height) / 2 + glyph->height - 1;
+  const int cursorY = cellY + (cellSize - glyph->width) / 2;
+  renderCharImpl<TextRotation::Rotated90CWTrue>(*this, renderMode, font, cp, cursorX, cursorY, black, style);
+}
+
+void GfxRenderer::drawGlyphCentered(const int fontId, const int cellX, const int cellY, const int cellSize,
+                                    const char* utf8, const bool black, const EpdFontFamily::Style style) const {
+  if (utf8 == nullptr || *utf8 == '\0') return;
+  const auto fontIt = fontMap.find(fontId);
+  if (fontIt == fontMap.end()) {
+    LOG_ERR("GFX", "Font %d not found", fontId);
+    return;
+  }
+  const auto& font = fontIt->second;
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(utf8);
+  const uint32_t cp = utf8NextCodepoint(&p);
+  if (cp == 0) return;
+  const EpdGlyph* glyph = font.getGlyph(cp, style);
+  if (glyph == nullptr) return;
+
+  // None mapping: screenX = cursorX + left + glyphX, screenY = cursorY - top + glyphY
+  // (cursorY is the baseline). Position so the ink box is centred in the cell.
+  const int cursorX = cellX + (cellSize - glyph->width) / 2 - glyph->left;
+  const int cursorY = cellY + (cellSize - glyph->height) / 2 + glyph->top;
+  renderCharImpl<TextRotation::None>(*this, renderMode, font, cp, cursorX, cursorY, black, style);
 }
 
 uint8_t* GfxRenderer::getFrameBuffer() const { return frameBuffer; }

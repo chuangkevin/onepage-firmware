@@ -623,6 +623,16 @@ std::vector<size_t> ParsedText::computeLineBreaks(const GfxRenderer& renderer, c
         continue;
       }
 
+      // CJK kinsoku (禁則處理): a line must not end on an opening bracket / dash /
+      // opening quote, and the next line must not begin with sentence-final
+      // punctuation or a closing bracket. Enforced here as well as at tokenisation
+      // so it still holds when a long run was flushed across separate addWord()
+      // calls (the case that left 「 orphaned at the end of a column).
+      if (j + 1 < totalWordCount && (isNoBreakAfterCjkPunctuation(lastCodepoint(words[j])) ||
+                                     isNoBreakBeforeCjkPunctuation(firstCodepoint(words[j + 1])))) {
+        continue;
+      }
+
       int cost;
       if (j == totalWordCount - 1) {
         cost = 0;  // Last line
@@ -741,6 +751,14 @@ std::vector<size_t> ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& r
     // Don't break before a continuation word (e.g., orphaned "?" after "question").
     // Backtrack to the start of the continuation group so the whole group moves to the next line.
     while (currentIndex > lineStart + 1 && currentIndex < wordWidths.size() && continuesVec[currentIndex]) {
+      --currentIndex;
+    }
+
+    // CJK kinsoku: never end a line on an opening bracket/dash/opening quote, and
+    // never start the next line with closing/sentence-final punctuation.
+    while (currentIndex > lineStart + 1 && currentIndex < wordWidths.size() &&
+           (isNoBreakAfterCjkPunctuation(lastCodepoint(words[currentIndex - 1])) ||
+            isNoBreakBeforeCjkPunctuation(firstCodepoint(words[currentIndex])))) {
       --currentIndex;
     }
 

@@ -19,11 +19,10 @@ static int encodeUtf8(const uint32_t cp, char* buf) {
   return 3;
 }
 
-// Sentence punctuation only. Vertical Chinese typesetting puts these at the
-// TOP-RIGHT of the character cell. Brackets (「」『』（）【】《》) are deliberately
-// NOT in this set: their glyphs already fill the em box, so they belong centred
-// and shifting them just looks broken.
-static bool isVerticalTopRightPunctuation(const uint32_t cp) {
+// Sentence punctuation. Taiwanese (教育部) vertical typesetting centres these in the
+// character cell. Brackets (「」『』（）【】《》) are deliberately NOT in this set: they
+// are handled separately (rotated, then nudged to a cell corner).
+static bool isVerticalSentencePunctuation(const uint32_t cp) {
   switch (cp) {
     case 0x3001:  // 、
     case 0x3002:  // 。
@@ -56,6 +55,61 @@ static uint32_t verticalFormOf(const uint32_t cp) {
     case 0x300E: return 0xFE43;  // 『
     case 0x300F: return 0xFE44;  // 』
     default: return 0;
+  }
+}
+
+// Characters whose horizontal glyph, rotated 90 degrees clockwise, IS the correct
+// vertical-setting glyph (it matches the font's own vertical presentation form, e.g.
+// 「 U+300C rotated == FE41). Used only when the font has no vertical form, because
+// otherwise the horizontal glyph would sit un-rotated in the middle of the cell and
+// read as broken - the previous behaviour for brackets.
+static bool isVerticalRotatedPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case 0x300C: case 0x300D:  // 「 」
+    case 0x300E: case 0x300F:  // 『 』
+    case 0x3008: case 0x3009:  // 〈 〉
+    case 0x300A: case 0x300B:  // 《 》
+    case 0x3010: case 0x3011:  // 【 】
+    case 0x3014: case 0x3015:  // 〔 〕
+    case 0x3016: case 0x3017:  // 〖 〗
+    case 0xFF08: case 0xFF09:  // （ ）
+    case 0xFF3B: case 0xFF3D:  // ［ ］
+    case 0xFF5B: case 0xFF5D:  // ｛ ｝
+    case 0x2014: case 0x2015:  // — ―
+    case 0xFF0D:               // －
+    case 0x2026: case 0x2025:  // … ‥
+    case 0x2018: case 0x2019:  // ' '
+    case 0x201C: case 0x201D:  // " "
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Opening vs closing brackets/quotes. Taiwanese (教育部) vertical typesetting hugs the
+// quoted text: the opening mark sits at the BOTTOM-LEFT of its cell and the closing mark
+// at the TOP-RIGHT, so the pair brackets the characters between them.
+static bool isVerticalOpeningBracket(const uint32_t cp) {
+  switch (cp) {
+    case 0x300C: case 0x300E: case 0x3008: case 0x300A:  // 「 『 〈 《
+    case 0x3010: case 0x3014: case 0x3016:               // 【 〔 〖
+    case 0xFF08: case 0xFF3B: case 0xFF5B:               // （ ［ ｛
+    case 0x2018: case 0x201C:                            // ' "
+      return true;
+    default:
+      return false;
+  }
+}
+
+static bool isVerticalClosingBracket(const uint32_t cp) {
+  switch (cp) {
+    case 0x300D: case 0x300F: case 0x3009: case 0x300B:  // 」 』 〉 》
+    case 0x3011: case 0x3015: case 0x3017:               // 】 〕 〗
+    case 0xFF09: case 0xFF3D: case 0xFF5D:               // ） ］ ｝
+    case 0x2019: case 0x201D:                            // ' "
+      return true;
+    default:
+      return false;
   }
 }
 
@@ -119,16 +173,40 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
           }
         }
         if (!placed) {
-          const int glyphWidth = renderer.getTextWidth(fontId, draw.c_str(), verticalStyle, baseDir);
-          gx = x + (lineHeight - glyphWidth) / 2;
-          if (isVerticalTopRightPunctuation(cp)) {
-            // No vertical form in this font: fall back to nudging the horizontal
-            // glyph towards the top-right corner.
-            gx += lineHeight / 2;
-            gy -= lineHeight / 2;
+          if (isVerticalRotatedPunctuation(cp)) {
+            // Brackets, dashes and the ellipsis have no useful pre-positioned form in
+            // fonts without vertical glyphs: rotate the horizontal glyph 90 degrees CW
+            // so it reads correctly down the column, matching the font's own vertical
+            // form (e.g. 「 rotated == U+FE41).
+            //
+            // Taiwanese (教育部) style then hugs the quoted text: the opening mark sits
+            // at the bottom-right of its cell, the closing mark at the top-left.
+            const int nudge = lineHeight / 4;
+            int cellX = x;
+            int cellY = y + down;
+            if (isVerticalOpeningBracket(cp)) {
+              cellX += nudge;
+              cellY += nudge;
+            } else if (isVerticalClosingBracket(cp)) {
+              cellX -= nudge;
+              cellY -= nudge;
+            }
+            renderer.drawGlyphRotated90CW(fontId, cellX, cellY, lineHeight, glyph.c_str(), true, verticalStyle);
+            placed = true;
+          } else if (isVerticalSentencePunctuation(cp)) {
+            // Taiwanese style centres sentence punctuation in the cell. Centre by ink
+            // (not by advance): the glyph ink sits low-left in the em box, so a
+            // half-cell nudge would still leave it off-centre.
+            renderer.drawGlyphCentered(fontId, x, y + down, lineHeight, glyph.c_str(), true, verticalStyle);
+            placed = true;
+          } else {
+            const int glyphWidth = renderer.getTextWidth(fontId, draw.c_str(), verticalStyle, baseDir);
+            gx = x + (lineHeight - glyphWidth) / 2;
           }
         }
-        renderer.drawText(fontId, gx, gy, draw.c_str(), true, verticalStyle, baseDir);
+        if (!placed) {
+          renderer.drawText(fontId, gx, gy, draw.c_str(), true, verticalStyle, baseDir);
+        }
         down += lineHeight;
       }
     }

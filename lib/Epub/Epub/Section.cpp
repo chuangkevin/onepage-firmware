@@ -11,7 +11,9 @@
 
 namespace {
 // v27: words NFC-composed at layout time; bump invalidates NFD section caches.
-constexpr uint8_t SECTION_FILE_VERSION = 29;
+// v30: CJK kinsoku enforced in the line-break DP (opening brackets no longer end a
+// line, closing punctuation no longer starts one); bump so cached sections re-lay.
+constexpr uint8_t SECTION_FILE_VERSION = 30;
 // Layout parameters that must match or the section cache is rebuilt. `verticalText`
 // is one of them, so toggling vertical writing re-lays the chapter instead of
 // serving horizontally-laid pages from the cache.
